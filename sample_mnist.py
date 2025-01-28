@@ -26,36 +26,6 @@ import pwexp
 from net_model import *
 from mps_models import *
 
-
-# Loading dataset
-
-print("Loading Fashion-MNIST dataset...")
-fashion_mnist = tf.keras.datasets.fashion_mnist
-(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
-
-i_valid_train = pd.Series(train_labels).isin([0,1,2,3,4]).to_numpy()
-i_valid_test = pd.Series(test_labels).isin([0,1,2,3,4]).to_numpy()
-
-# Filters to take only the images with labels in [0, 1, 2, 3, 4]
-train_labels = train_labels[i_valid_train]
-test_labels = test_labels[i_valid_test]
-
-# Indices for each set of filtered data
-i_train = np.arange(train_images.shape[0])
-i_test = np.arange(test_images.shape[0])
-
-print("Dimension of the train set: {}".format(train_images.shape))
-print("Dimension of the test set: {}".format(test_images.shape))
-
-print("Done...")
-
-# Definição das probabilidades (REMOVER QUANDO FINALIZADOS OS CODIGOS)
-probs1 = np.array([0.9, 0.45, 0.22, 0.14, 0.08])
-cure_probs1 = pd.DataFrame({"Classe": ["0", "1", "2", "3", "4"], "p_0": [0.9, 0.45, 0.22, 0.14, 0.08]})
-cure_probs_dict1 = {0: 0.9, 1:0.45, 2:0.22, 3:0.14, 4: 0.08}
-cure_probs_dict1 = np.vectorize(cure_probs_dict1.get)
-cure_probs1
-
 def get_theta(log_a, log_phi, C, C_inv, sup, p_0, theta_min = None, theta_max = None):
     '''
         Given the specifications for the latent causes distribution and a vector with cure probabilities,
@@ -105,9 +75,16 @@ def generate_data(log_a, log_phi, theta, sup, low_c, high_c):
     # Retorna os tempos, deltas e o vetor de causas latentes (que na prática é desconhecido)
     return m, t, delta, cured
 
+def join_datasets(n_train, n_val, n_test, theta_train, theta_val, theta_test, m_train, m_val, m_test, t_train, t_val, t_test, delta_train, delta_val, delta_test):
+    sets = np.concatenate([np.repeat("train", n_train), np.repeat("val", n_val), np.repeat("test", n_test)])
+    theta = np.concatenate(theta_train, theta_val, theta_test)
+    m = np.concatenate(m_train, m_val, m_test)
+    t = np.concatenate(t_train, t_val, t_test)
+    delta = np.concatenate(delta_train, delta_val, delta_test)
+    return pd.DataFrame({"theta": theta_poisson, "m": m_poisson, "t": t_poisson, "delta": delta_poisson})
+    
 
-
-def sample_bootstrap_scenario1(n_train, n_val, n_test, cure_probs_dict, directory):
+def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_probs_dict, directory, file_index):
     n = n_train + n_val + n_test
 
     # ---------------------------- Sample the indices from the original dataset ----------------------------
@@ -140,6 +117,15 @@ def sample_bootstrap_scenario1(n_train, n_val, n_test, cure_probs_dict, director
     theta_test_poisson = get_theta(log_a_poisson, log_phi_poisson, C_poisson, C_inv_poisson, sup_poisson, p_test, theta_min = theta_min_poisson, theta_max = theta_max_poisson)
     m_test_poisson, t_test_poisson, delta_test_poisson, cured_test_poisson = \
         generate_data(log_a_poisson, log_phi_poisson, theta_test_poisson, sup_poisson, low_c, high_c)
+    # Save the DataFrame with the simulated values for the Poisson
+    poisson_data = join_datasets(
+        n_train, n_val, n_test,
+        theta_train_poisson, theta_val_poisson, theta_test_poisson,
+        m_train_poisson, m_val_poisson, m_test_poisson,
+        t_train_poisson, t_val_poisson, t_test_poisson,
+        delta_train_poisson, delta_val_poisson, delta_test_poisson
+    )
+    poisson_data.to_csv("{}/poisson/{}".format(directory, filename))
     
     # ---------------------------- Logarithmic ----------------------------
     # Logarithmic - Training data
@@ -154,6 +140,15 @@ def sample_bootstrap_scenario1(n_train, n_val, n_test, cure_probs_dict, director
     theta_test_log = get_theta(log_a_log, log_phi_log, C_log, C_inv_log, sup_log, p_test, theta_min = theta_min_log, theta_max = theta_max_log)
     m_test_log, t_test_log, delta_test_log, cured_test_log = \
         generate_data(log_a_log, log_phi_log, theta_test_log, sup_log, low_c, high_c)
+    # Save the DataFrame with the simulated values for the Logarithmic
+    log_data = join_datasets(
+        n_train, n_val, n_test,
+        theta_train_log, theta_val_log, theta_test_log,
+        m_train_log, m_val_log, m_test_log,
+        t_train_log, t_val_log, t_test_log,
+        delta_train_log, delta_val_log, delta_test_log
+    )
+    log_data.to_csv("{}/logarithmic/{}".format(directory, filename))
 
     # ---------------------------- Geometric ----------------------------
     # Geometric - Training data
@@ -168,6 +163,15 @@ def sample_bootstrap_scenario1(n_train, n_val, n_test, cure_probs_dict, director
     theta_test_geo = get_theta(log_a_nb(1), log_phi_nb(1), C_nb(1), C_inv_nb(1), sup_nb, p_test, theta_min = theta_min_nb, theta_max = theta_max_nb)
     m_test_geo, t_test_geo, delta_test_geo, cured_test_geo = \
         generate_data(log_a_nb(1), log_phi_nb(1), theta_test_geo, sup_nb, low_c, high_c)
+    # Save the DataFrame with the simulated values for the Geometric
+    geo_data = join_datasets(
+        n_train, n_val, n_test,
+        theta_train_geo, theta_val_geo, theta_test_geo,
+        m_train_geo, m_val_geo, m_test_geo,
+        t_train_geo, t_val_geo, t_test_geo,
+        delta_train_geo, delta_val_geo, delta_test_geo
+    )
+    geo_data.to_csv("{}/geometric/{}".format(directory, filename))
     
     # ---------------------------- NB(q = 2) ----------------------------
     # NB(2) - Training data
@@ -182,6 +186,15 @@ def sample_bootstrap_scenario1(n_train, n_val, n_test, cure_probs_dict, director
     theta_test_2nb = get_theta(log_a_nb(2), log_phi_nb(2), C_nb(2), C_inv_nb(2), sup_nb, p_test, theta_min = theta_min_nb, theta_max = theta_max_nb)
     m_test_2nb, t_test_2nb, delta_test_2nb, cured_test_2nb = \
         generate_data(log_a_nb(2), log_phi_nb(2), theta_test_2nb, sup_nb, low_c, high_c)
+    # Save the DataFrame with the simulated values for the NB(2)
+    nb2_data = join_datasets(
+        n_train, n_val, n_test,
+        theta_train_2nb, theta_val_2nb, theta_test_2nb,
+        m_train_2nb, m_val_2nb, m_test_2nb,
+        t_train_2nb, t_val_2nb, t_test_2nb,
+        delta_train_2nb, delta_val_2nb, delta_test_2nb
+    )
+    nb2_data.to_csv("{}/nb2/{}".format(directory, filename))
     
     # ---------------------------- Bernoulli ----------------------------
     # Bernoulli - Training data
@@ -196,6 +209,15 @@ def sample_bootstrap_scenario1(n_train, n_val, n_test, cure_probs_dict, director
     theta_test_bern = get_theta(log_a_bin(1), log_phi_bin(1), C_bin(1), C_inv_bin(1), sup_bin(1), p_test, theta_min = theta_min_bin, theta_max = theta_max_bin)
     m_test_bern, t_test_bern, delta_test_bern, cured_test_bern = \
         generate_data(log_a_bin(1), log_phi_bin(1), theta_test_bern, sup_bin(1), low_c, high_c)
+    # Save the DataFrame with the simulated values for the Bernoulli
+    bern_data = join_datasets(
+        n_train, n_val, n_test,
+        theta_train_bern, theta_val_bern, theta_test_bern,
+        m_train_bern, m_val_bern, m_test_bern,
+        t_train_bern, t_val_bern, t_test_bern,
+        delta_train_bern, delta_val_bern, delta_test_bern
+    )
+    bern_data.to_csv("{}/bernoulli/{}".format(directory, filename))
 
     # ---------------------------- Binomial (q = 5) ----------------------------
     # Binomial(5) - Training data
@@ -210,7 +232,43 @@ def sample_bootstrap_scenario1(n_train, n_val, n_test, cure_probs_dict, director
     theta_test_5bin = get_theta(log_a_bin(5), log_phi_bin(5), C_bin(5), C_inv_bin(5), sup_bin(5), p_test, theta_min = theta_min_bin, theta_max = theta_max_bin)
     m_test_5bin, t_test_5bin, delta_test_5bin, cured_test_5bin = \
         generate_data(log_a_bin(5), log_phi_bin(5), theta_test_5bin, sup_bin(5), low_c, high_c)
+    # Save the DataFrame with the simulated values for the Bin(5)
+    bin5_data = join_datasets(
+        n_train, n_val, n_test,
+        theta_train_5bin, theta_val_5bin, theta_test_5bin,
+        m_train_5bin, m_val_5bin, m_test_5bin,
+        t_train_5bin, t_val_5bin, t_test_5bin,
+        delta_train_5bin, delta_val_5bin, delta_test_5bin
+    )
+    bin5_data.to_csv("{}/bin5/{}".format(directory, filename))
     
     
+    # SAVE EVERYTHING IN FILES NOW!!!
+    
+
+    
+if(__name__ == "__main__"):
+    # Loading dataset
+
+    print("Loading Fashion-MNIST dataset...")
+    fashion_mnist = tf.keras.datasets.fashion_mnist
+    (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+
+    i_valid_train = pd.Series(train_labels).isin([0,1,2,3,4]).to_numpy()
+    i_valid_test = pd.Series(test_labels).isin([0,1,2,3,4]).to_numpy()
+
+    # Filters to take only the images with labels in [0, 1, 2, 3, 4]
+    train_labels = train_labels[i_valid_train]
+    test_labels = test_labels[i_valid_test]
+
+    # Indices for each set of filtered data
+    i_train = np.arange(train_images.shape[0])
+    i_test = np.arange(test_images.shape[0])
+
+    print("Dimension of the train set: {}".format(train_images.shape))
+    print("Dimension of the test set: {}".format(test_images.shape))
+    print("Done...")
     
     
+    print("Tomando uma amostra para cada uma das distribuições de interesse.")
+    sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_probs_dict, directory, file_index):

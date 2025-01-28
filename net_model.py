@@ -536,7 +536,7 @@ def call_EM(em_filename,
             x_val = None, t_val = None, delta_val = None, m_val = None,
             verbose = 1, alpha_known = False):
                   
-    # CRIAR TODA A ESTRUTURA DOS DIRETÓRIOS, CASO NÃO EXISTA --- FAZER ISSO CASO TUDO FUNCIONE (MÃOZINHA MÃOZINHA MÃOZINHA)
+    # CRIAR TODA A ESTRUTURA DOS DIRETÓRIOS, CASO NÃO EXISTA --- FAZER ISSO !!!
     data_dir = "EM_data"
     
     # Limpa todos os arquivos da pasta EM_data
