@@ -18,6 +18,7 @@ config.gpu_options.allow_growth = True
 sess = tf.compat.v1.Session(config = config)
 
 import os, shutil
+from pathlib import Path
 import json
 import subprocess
 
@@ -77,21 +78,29 @@ def generate_data(log_a, log_phi, theta, sup, low_c, high_c):
 
 def join_datasets(n_train, n_val, n_test, theta_train, theta_val, theta_test, m_train, m_val, m_test, t_train, t_val, t_test, delta_train, delta_val, delta_test):
     sets = np.concatenate([np.repeat("train", n_train), np.repeat("val", n_val), np.repeat("test", n_test)])
-    theta = np.concatenate(theta_train, theta_val, theta_test)
-    m = np.concatenate(m_train, m_val, m_test)
-    t = np.concatenate(t_train, t_val, t_test)
-    delta = np.concatenate(delta_train, delta_val, delta_test)
-    return pd.DataFrame({"theta": theta_poisson, "m": m_poisson, "t": t_poisson, "delta": delta_poisson})
-    
+    theta = np.concatenate([theta_train, theta_val, theta_test])
+    m = np.concatenate([m_train, m_val, m_test])
+    t = np.concatenate([t_train, t_val, t_test])
+    delta = np.concatenate([delta_train, delta_val, delta_test])
+    return pd.DataFrame({"theta": theta, "m": m, "t": t, "delta": delta, "set": sets})
 
-def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_probs_dict, directory, file_index):
+def sample_single_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_probs_dict_vec, directory, file_index):
+    '''
+        Get a single bootstrap sample from the Fashion-MNIST dataset considering each distribution from scenario 1.
+    '''
     n = n_train + n_val + n_test
+    filename = "data_{}.csv".format(file_index)
 
     # ---------------------------- Sample the indices from the original dataset ----------------------------
     
     # Indices for train and validation
     i_train_val = np.random.choice(i_train, size = n_train + n_val, replace = True)
     i_test = np.random.choice(i_test, size = n_test, replace = True)
+
+    sets = np.concatenate([np.repeat("train", n_train), np.repeat("val", n_val), np.repeat("test", n_test)])
+    indices = np.concatenate([i_train_val, i_test])
+    pd.DataFrame({"index": indices, "set": sets}).to_csv("{}/indices_1.csv".format(directory))
+
     
     # The labels for the train set are the first n_train sampled indices in i_train_val
     label_train = train_labels[i_train_val[:n_train]]
@@ -100,10 +109,15 @@ def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_pro
     # Takes the labels for the test set
     label_test = test_labels[i_test]
     
-    p_train = cure_probs_dict(label_train)
-    p_val = cure_probs_dict(label_val)
-    p_test = cure_probs_dict(label_test)
+    p_train = cure_probs_dict_vec(label_train)
+    p_val = cure_probs_dict_vec(label_val)
+    p_test = cure_probs_dict_vec(label_test)
 
+    # The censored times follow a U(low_c, high_c) distribution - To control the censored and cured observations properly, we should have a different distribution 
+    # for each of the chosen distributions for M
+    low_c = 0
+    high_c = 6
+    
     # ---------------------------- Poisson ----------------------------
     # Poisson - Training data
     theta_train_poisson = get_theta(log_a_poisson, log_phi_poisson, C_poisson, C_inv_poisson, sup_poisson, p_train, theta_min = theta_min_poisson, theta_max = theta_max_poisson)
@@ -125,7 +139,7 @@ def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_pro
         t_train_poisson, t_val_poisson, t_test_poisson,
         delta_train_poisson, delta_val_poisson, delta_test_poisson
     )
-    poisson_data.to_csv("{}/poisson/{}".format(directory, filename))
+    poisson_data.to_csv("{}/poisson/{}".format(directory, filename), index = False)
     
     # ---------------------------- Logarithmic ----------------------------
     # Logarithmic - Training data
@@ -148,7 +162,7 @@ def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_pro
         t_train_log, t_val_log, t_test_log,
         delta_train_log, delta_val_log, delta_test_log
     )
-    log_data.to_csv("{}/logarithmic/{}".format(directory, filename))
+    log_data.to_csv("{}/logarithmic/{}".format(directory, filename), index = False)
 
     # ---------------------------- Geometric ----------------------------
     # Geometric - Training data
@@ -171,7 +185,7 @@ def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_pro
         t_train_geo, t_val_geo, t_test_geo,
         delta_train_geo, delta_val_geo, delta_test_geo
     )
-    geo_data.to_csv("{}/geometric/{}".format(directory, filename))
+    geo_data.to_csv("{}/geometric/{}".format(directory, filename), index = False)
     
     # ---------------------------- NB(q = 2) ----------------------------
     # NB(2) - Training data
@@ -194,7 +208,7 @@ def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_pro
         t_train_2nb, t_val_2nb, t_test_2nb,
         delta_train_2nb, delta_val_2nb, delta_test_2nb
     )
-    nb2_data.to_csv("{}/nb2/{}".format(directory, filename))
+    nb2_data.to_csv("{}/nb2/{}".format(directory, filename), index = False)
     
     # ---------------------------- Bernoulli ----------------------------
     # Bernoulli - Training data
@@ -217,7 +231,7 @@ def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_pro
         t_train_bern, t_val_bern, t_test_bern,
         delta_train_bern, delta_val_bern, delta_test_bern
     )
-    bern_data.to_csv("{}/bernoulli/{}".format(directory, filename))
+    bern_data.to_csv("{}/bernoulli/{}".format(directory, filename), index = False)
 
     # ---------------------------- Binomial (q = 5) ----------------------------
     # Binomial(5) - Training data
@@ -240,10 +254,8 @@ def sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_pro
         t_train_5bin, t_val_5bin, t_test_5bin,
         delta_train_5bin, delta_val_5bin, delta_test_5bin
     )
-    bin5_data.to_csv("{}/bin5/{}".format(directory, filename))
+    bin5_data.to_csv("{}/bin5/{}".format(directory, filename), index = False)
     
-    
-    # SAVE EVERYTHING IN FILES NOW!!!
     
 
     
@@ -262,13 +274,51 @@ if(__name__ == "__main__"):
     test_labels = test_labels[i_valid_test]
 
     # Indices for each set of filtered data
-    i_train = np.arange(train_images.shape[0])
-    i_test = np.arange(test_images.shape[0])
+    i_train = np.arange(train_labels.shape[0])
+    i_test = np.arange(test_labels.shape[0])
 
     print("Dimension of the train set: {}".format(train_images.shape))
     print("Dimension of the test set: {}".format(test_images.shape))
-    print("Done...")
+    print("------------------------------------------------------------------------")
     
+    print("Creating directories structure")
+    dists_scenario1 = ["poisson", "logarithmic", "geometric", "nb2", "bernoulli", "bin5"]
+    dists_scenario2 = ["borel", "rgp2", "rgp10", "haight", "geeta"]
+    for dist in dists_scenario1:
+        Path("Datasets/Scenario1/n500/{}".format(dist)).mkdir(parents=True, exist_ok=True)
+        Path("Datasets/Scenario1/n1000/{}".format(dist)).mkdir(parents=True, exist_ok=True)
+        Path("Datasets/Scenario1/n3000/{}".format(dist)).mkdir(parents=True, exist_ok=True)
+    for dist in dists_scenario2:
+        Path("Datasets/Scenario2/n500/{}".format(dist)).mkdir(parents=True, exist_ok=True)
+        Path("Datasets/Scenario2/n1000/{}".format(dist)).mkdir(parents=True, exist_ok=True)
+        Path("Datasets/Scenario2/n3000/{}".format(dist)).mkdir(parents=True, exist_ok=True)
+
+    print("------------------------------------------------------------------------")
+
+
+
+    # <td> 1 </td> <td> 500 </td> <td> 716 </td> <td> 108 </td> <td> 108 </td>
+    # </tr>
+    # <tr>
+    #     <td> 2 </td> <td> 1000 </td> <td> 1428 </td> <td> 214 </td> <td> 214 </td>
+    # </tr>
+    # <tr>
+    #     <td> 3 </td> <td> 3000 </td> <td> 4286 </td> <td> 643 </td> <td> 643 </td>
+
     
-    print("Tomando uma amostra para cada uma das distribuições de interesse.")
-    sample_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_probs_dict, directory, file_index):
+    print("Taking a sample for each of the distributions of interest")
+    cure_probs_dict1 = {0: 0.9, 1:0.45, 2:0.22, 3:0.14, 4: 0.08}
+    cure_probs_dict1 = np.vectorize(cure_probs_dict1.get)
+    
+    # sample_single_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, cure_probs_dict, directory, file_index)
+    sample_single_bootstrap_scenario1(i_train, i_test, n_train = 500, n_val = 108, n_test = 108, cure_probs_dict_vec = cure_probs_dict1, directory = "Datasets/Scenario1/n500", file_index = 1)
+
+
+
+
+
+
+
+
+
+    
