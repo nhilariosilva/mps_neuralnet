@@ -11,6 +11,7 @@ import pwexp
 
 # Valor máximo do suporte da distribuição
 B = 10001
+B_str = "10001"
 
 # ---------------------------- Poisson (Pocr) ----------------------------
 # Versões sem o tensorflow
@@ -24,6 +25,12 @@ log_phi_poisson_tf = lambda theta : tf.math.log(theta)
 C_poisson_tf = lambda theta : tf.math.exp(theta)
 C_inv_poisson_tf = lambda u : tf.math.log(u)
 sup_poisson = np.arange(0, B, 1).astype(np.float64)
+# Versões para o EM
+log_a_poisson_str = "lambda m : -tf.math.lgamma(m+1)"
+log_phi_poisson_str = "lambda theta : tf.math.log(theta)"
+C_poisson_str = "lambda theta : tf.math.exp(theta)"
+C_inv_poisson_str = "lambda u : tf.math.log(u)"
+sup_poisson_str = "np.arange(0, B, 1).astype(np.float64)"
 
 theta_min_poisson = None
 theta_max_poisson = None
@@ -82,6 +89,36 @@ def E_nb(q, theta):
 # Overdispersion: in this case, variance is always greater than mean
 def Var_nb(q, theta):
     return q*(1-theta)/theta**2
+
+
+# ---------------------------- Binomial Negativa (Mean-Variance parametrization) (MVNBcr) ----------------------------
+# Versões sem o tensorflow
+def log_a_mvnb(q):
+    return lambda m : loggamma(1/q+m) - loggamma(1/q) - loggamma(m+1)
+def log_phi_mvnb(q):
+    return lambda theta : np.log(q*theta) - np.log(1+q*theta)
+def C_mvnb(q):
+    return lambda theta : (1 + q*theta)**(1/q)
+def C_inv_mvnb(q):
+    return lambda u : (u**q - 1)/q
+# Versões para o tensorflow
+def log_a_mvnb_tf(q):
+    return lambda m : tf.math.lgamma(1/q+m) - tf.math.lgamma(1/q) - tf.math.lgamma(m+1)
+def log_phi_mvnb_tf(q):
+    return lambda theta : tf.math.log(q*theta) - tf.math.log(1+q*theta)
+def C_mvnb_tf(q):
+    return lambda theta : (1 + q*theta)**(1/q)
+def C_inv_mvnb_tf(q):
+    return lambda u : (u**q - 1) / q
+sup_mvnb = np.arange(0, B, 1).astype(np.float64)
+
+theta_min_mvnb = None
+theta_max_mvnb = None
+def E_mvnb(q, theta):
+    return theta
+# Overdispersion: in this case, variance is always greater than mean
+def Var_mvnb(q, theta):
+    return (1+q*theta)*theta
 
 # ---------------------------- Binomial (+Bernoulli) (Bincr + Bercr) ----------------------------
 # Versões sem o tensorflow

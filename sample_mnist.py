@@ -166,17 +166,17 @@ def sample_single_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, c
 
     # ---------------------------- Geometric ----------------------------
     # Geometric - Training data
-    theta_train_geo = get_theta(log_a_nb(1), log_phi_nb(1), C_nb(1), C_inv_nb(1), sup_nb, p_train, theta_min = theta_min_nb, theta_max = theta_max_nb)
+    theta_train_geo = get_theta(log_a_mvnb(1), log_phi_mvnb(1), C_mvnb(1), C_inv_mvnb(1), sup_mvnb, p_train, theta_min = theta_min_mvnb, theta_max = theta_max_mvnb)
     m_train_geo, t_train_geo, delta_train_geo, cured_train_geo = \
-        generate_data(log_a_nb(1), log_phi_nb(1), theta_train_geo, sup_nb, low_c, high_c)
+        generate_data(log_a_mvnb(1), log_phi_mvnb(1), theta_train_geo, sup_mvnb, low_c, high_c)
     # Geometric - Validation data
-    theta_val_geo = get_theta(log_a_nb(1), log_phi_nb(1), C_nb(1), C_inv_nb(1), sup_nb, p_val, theta_min = theta_min_nb, theta_max = theta_max_nb)
+    theta_val_geo = get_theta(log_a_mvnb(1), log_phi_mvnb(1), C_mvnb(1), C_inv_mvnb(1), sup_mvnb, p_val, theta_min = theta_min_mvnb, theta_max = theta_max_mvnb)
     m_val_geo, t_val_geo, delta_val_geo, cured_val_geo = \
-        generate_data(log_a_nb(1), log_phi_nb(1), theta_val_geo, sup_nb, low_c, high_c)
+        generate_data(log_a_mvnb(1), log_phi_mvnb(1), theta_val_geo, sup_mvnb, low_c, high_c)
     # Geometric - Test data
-    theta_test_geo = get_theta(log_a_nb(1), log_phi_nb(1), C_nb(1), C_inv_nb(1), sup_nb, p_test, theta_min = theta_min_nb, theta_max = theta_max_nb)
+    theta_test_geo = get_theta(log_a_mvnb(1), log_phi_mvnb(1), C_mvnb(1), C_inv_mvnb(1), sup_mvnb, p_test, theta_min = theta_min_mvnb, theta_max = theta_max_mvnb)
     m_test_geo, t_test_geo, delta_test_geo, cured_test_geo = \
-        generate_data(log_a_nb(1), log_phi_nb(1), theta_test_geo, sup_nb, low_c, high_c)
+        generate_data(log_a_mvnb(1), log_phi_mvnb(1), theta_test_geo, sup_mvnb, low_c, high_c)
     # Save the DataFrame with the simulated values for the Geometric
     geo_data = join_datasets(
         n_train, n_val, n_test,
@@ -189,26 +189,50 @@ def sample_single_bootstrap_scenario1(i_train, i_test, n_train, n_val, n_test, c
     
     # ---------------------------- NB(q = 2) ----------------------------
     # NB(2) - Training data
-    theta_train_2nb = get_theta(log_a_nb(2), log_phi_nb(2), C_nb(2), C_inv_nb(2), sup_nb, p_train, theta_min = theta_min_nb, theta_max = theta_max_nb)
-    m_train_2nb, t_train_2nb, delta_train_2nb, cured_train_2nb = \
-        generate_data(log_a_nb(1), log_phi_nb(1), theta_train_2nb, sup_nb, low_c, high_c)
-    # NB(2) - Validation data
-    theta_val_2nb = get_theta(log_a_nb(2), log_phi_nb(2), C_nb(2), C_inv_nb(2), sup_nb, p_val, theta_min = theta_min_nb, theta_max = theta_max_nb)
-    m_val_2nb, t_val_2nb, delta_val_2nb, cured_val_2nb = \
-        generate_data(log_a_nb(2), log_phi_nb(2), theta_val_2nb, sup_nb, low_c, high_c)
-    # NB(2) - Test data
-    theta_test_2nb = get_theta(log_a_nb(2), log_phi_nb(2), C_nb(2), C_inv_nb(2), sup_nb, p_test, theta_min = theta_min_nb, theta_max = theta_max_nb)
-    m_test_2nb, t_test_2nb, delta_test_2nb, cured_test_2nb = \
-        generate_data(log_a_nb(2), log_phi_nb(2), theta_test_2nb, sup_nb, low_c, high_c)
-    # Save the DataFrame with the simulated values for the NB(2)
+    # theta_train_2nb = get_theta(log_a_nb(2), log_phi_nb(2), C_nb(2), C_inv_nb(2), sup_nb, p_train, theta_min = theta_min_nb, theta_max = theta_max_nb)
+    # m_train_2nb, t_train_2nb, delta_train_2nb, cured_train_2nb = \
+    #     generate_data(log_a_nb(1), log_phi_nb(1), theta_train_2nb, sup_nb, low_c, high_c)
+    # # NB(2) - Validation data
+    # theta_val_2nb = get_theta(log_a_nb(2), log_phi_nb(2), C_nb(2), C_inv_nb(2), sup_nb, p_val, theta_min = theta_min_nb, theta_max = theta_max_nb)
+    # m_val_2nb, t_val_2nb, delta_val_2nb, cured_val_2nb = \
+    #     generate_data(log_a_nb(2), log_phi_nb(2), theta_val_2nb, sup_nb, low_c, high_c)
+    # # NB(2) - Test data
+    # theta_test_2nb = get_theta(log_a_nb(2), log_phi_nb(2), C_nb(2), C_inv_nb(2), sup_nb, p_test, theta_min = theta_min_nb, theta_max = theta_max_nb)
+    # m_test_2nb, t_test_2nb, delta_test_2nb, cured_test_2nb = \
+    #     generate_data(log_a_nb(2), log_phi_nb(2), theta_test_2nb, sup_nb, low_c, high_c)
+    # # Save the DataFrame with the simulated values for the NB(2)
+    # nb2_data = join_datasets(
+    #     n_train, n_val, n_test,
+    #     theta_train_2nb, theta_val_2nb, theta_test_2nb,
+    #     m_train_2nb, m_val_2nb, m_test_2nb,
+    #     t_train_2nb, t_val_2nb, t_test_2nb,
+    #     delta_train_2nb, delta_val_2nb, delta_test_2nb
+    # )
+    # nb2_data.to_csv("{}/nb2/{}".format(directory, filename), index = False)
+
+    # ---------------------------- MVNB(q = 1/2) ----------------------------
+    # MVNB(2) - Training data
+    theta_train_2mvnb = get_theta(log_a_mvnb(1/2), log_phi_mvnb(1/2), C_nb(1/2), C_inv_mvnb(1/2), sup_mvnb, p_train, theta_min = theta_min_mvnb, theta_max = theta_max_mvnb)
+    m_train_2mvnb, t_train_2mvnb, delta_train_2mvnb, cured_train_2mvnb = \
+        generate_data(log_a_mvnb(1/2), log_phi_mvnb(1/2), theta_train_2mvnb, sup_mvnb, low_c, high_c)
+    # MVNB(2) - Validation data
+    theta_val_2mvnb = get_theta(log_a_mvnb(1/2), log_phi_mvnb(1/2), C_mvnb(1/2), C_inv_mvnb(1/2), sup_mvnb, p_val, theta_min = theta_min_mvnb, theta_max = theta_max_mvnb)
+    m_val_2mvnb, t_val_2mvnb, delta_val_2mvnb, cured_val_2mvnb = \
+        generate_data(log_a_mvnb(1/2), log_phi_mvnb(1/2), theta_val_2mvnb, sup_mvnb, low_c, high_c)
+    # MVNB(2) - Test data
+    theta_test_2mvnb = get_theta(log_a_mvnb(1/2), log_phi_mvnb(1/2), C_mvnb(1/2), C_inv_mvnb(1/2), sup_mvnb, p_test, theta_min = theta_min_mvnb, theta_max = theta_max_mvnb)
+    m_test_2mvnb, t_test_2mvnb, delta_test_2mvnb, cured_test_2mvnb = \
+        generate_data(log_a_mvnb(1/2), log_phi_mvnb(1/2), theta_test_2mvnb, sup_mvnb, low_c, high_c)
+    # Save the DataFrame with the simulated values for the MVNB(2)
     nb2_data = join_datasets(
         n_train, n_val, n_test,
-        theta_train_2nb, theta_val_2nb, theta_test_2nb,
-        m_train_2nb, m_val_2nb, m_test_2nb,
-        t_train_2nb, t_val_2nb, t_test_2nb,
-        delta_train_2nb, delta_val_2nb, delta_test_2nb
+        theta_train_2mvnb, theta_val_2mvnb, theta_test_2mvnb,
+        m_train_2mvnb, m_val_2mvnb, m_test_2mvnb,
+        t_train_2mvnb, t_val_2mvnb, t_test_2mvnb,
+        delta_train_2mvnb, delta_val_2mvnb, delta_test_2mvnb
     )
-    nb2_data.to_csv("{}/nb2/{}".format(directory, filename), index = False)
+    nb2_data.to_csv("{}/mvnb2/{}".format(directory, filename), index = False)
+    
     
     # ---------------------------- Bernoulli ----------------------------
     # Bernoulli - Training data
@@ -442,7 +466,7 @@ if(__name__ == "__main__"):
     print("------------------------------------------------------------------------------------")
     
     print("Creating directories structure")
-    dists_scenario1 = ["poisson", "logarithmic", "geometric", "nb2", "bernoulli", "bin5"]
+    dists_scenario1 = ["poisson", "logarithmic", "geometric", "mvnb2", "bernoulli", "bin5"]
     dists_scenario2 = ["borel", "rgp2", "rgp10", "haight", "geeta3"]
     for dist in dists_scenario1:
         Path("SimulationDataset/Scenario1/n500/{}".format(dist)).mkdir(parents=True, exist_ok=True)
@@ -457,7 +481,7 @@ if(__name__ == "__main__"):
         print("Do you want to run scenario 1? It may delete files that already exist!")
         r = input()
     # If the directory was deleted, it's better to just run everything without having to ask the user
-    if(deleted_directory or r[0] == "y"):
+    if(deleted_directory or r[0].lower() == "y"):
         print("---------------------------- Scenario 1 ----------------------------")
         cure_probs_dict1 = {0: 0.9, 1:0.45, 2:0.22, 3:0.14, 4: 0.08}
         cure_probs_dict1 = np.vectorize(cure_probs_dict1.get)
@@ -465,7 +489,7 @@ if(__name__ == "__main__"):
         train_sizes = [500, 1000, 3000] # 3 sample sizes
         val_sizes = [108, 214, 643]
         test_sizes = [108, 214, 643]
-    
+        
         n_replicates = 100
         
         for j in range(len(train_sizes)):
@@ -487,7 +511,7 @@ if(__name__ == "__main__"):
     if(not deleted_directory):
         print("Do you want to run scenario 2? It may delete files that already exist!")
         r = input()
-    if(deleted_directory or r[0] == "y"):
+    if(deleted_directory or r[0].lower() == "y"):
         print("---------------------------- Scenario 2 ----------------------------")
         cure_probs_dict2 = {0: 0.95, 1:0.85, 2:0.75, 3:0.65, 4: 0.55}
         cure_probs_dict2 = np.vectorize(cure_probs_dict2.get)
