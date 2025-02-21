@@ -5,17 +5,16 @@ import json
 from net_model import *
 
 class MPScrModel(MPScrModelStructure):
-    def __init__(self, a, phi, C, C_inv, sup, theta_min = None, theta_max = None, link = "logit"):
-        super().__init__(a, phi, C, C_inv, sup, theta_min, theta_max, link)
+    def __init__(self, log_a, log_phi, C, C_inv, sup, theta_min = None, theta_max = None, link = "logit"):
+        super().__init__(log_a, log_phi, C, C_inv, sup, theta_min, theta_max, link)
             
-    def define_structure(self, shape_input, seed = 42):
+    def define_structure(self, shape_input):
         self.shape_input = shape_input
-        self.seed = seed
         
         # Gera uma imagem inteira de zeros com as dimensões do modelo
         dummy_input = np.zeros((1,) + self.shape_input)
         
-        # initializer = initializers.HeNormal(seed = self.seed)
+        # initializer = initializers.HeNormal()
         initializer = tf.random_normal_initializer(stddev = 0.005)
 
         self.convolution1 = keras.layers.Conv2D(filters = 4, kernel_size = [5,5], padding = "same", activation = tf.nn.leaky_relu,
@@ -48,8 +47,8 @@ class MPScrModel(MPScrModelStructure):
         return x
     
     def copy(self):
-        new_model = MPScrModel(self.a, self.phi, self.C, self.C_inv, self.sup, self.theta_min, self.theta_max, self.link)
-        new_model.define_structure(shape_input = self.shape_input, seed = self.seed)
+        new_model = MPScrModel(self.log_a, self.log_phi, self.C, self.C_inv, self.sup, self.theta_min, self.theta_max, self.link)
+        new_model.define_structure(shape_input = self.shape_input)
         new_model.set_weights(self.get_weights())
         return new_model
     

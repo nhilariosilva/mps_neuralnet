@@ -17,6 +17,9 @@ from tqdm import tqdm
 import mps
 import pwexp
 
+import os, shutil
+from pathlib import Path
+
 tf.keras.backend.set_floatx('float64')
 
 def set_all_seeds(seed=42):
@@ -94,12 +97,10 @@ class MPScrModelStructure(keras.models.Model):
             self.r_max = np.max([C_theta_min, C_theta_max])
             self.r_mid = (self.r_min + self.r_max)/2
             
-    def define_structure(self, seed = 42):
+    def define_structure(self):
         '''
             Define toda a estrutura da rede neural. Caso tenha o interesse em modificar a estrutura do modelo, deverá ser criada uma nova classe que herda MPScrModelStructure e atualizar essa função, além da função call e copy.
         '''
-        self.seed = seed
-    
         # Por padrão, supõe que o modelo recebe vetores unidimensionais
         self.shape_input = (1,)
         dummy_input = np.zeros(self.shape_input)
@@ -107,7 +108,7 @@ class MPScrModelStructure(keras.models.Model):
 
         # Declara a estrutura do modelo de redes neurais.
         # Por padrão é um simples modelo denso com 10 neurônios na camada oculta.
-        initializer = initializers.HeNormal(seed = seed)
+        initializer = initializers.HeNormal()
         self.in_layer = layers.InputLayer(input_shape = (1,))
         self.dense1 = layers.Dense(10, activation = keras.activations.sigmoid, kernel_initializer = initializer)
         self.out_layer = layers.Dense(1, activation = None, use_bias = False, kernel_initializer = initializer)
@@ -126,7 +127,7 @@ class MPScrModelStructure(keras.models.Model):
     def copy(self):
         # Cria um objeto da mesma classe, passando os parâmetros do objeto atual como inputs
         new_model = MPScrModelStructure(self.log_a, self.log_phi, self.C, self.C_inv, self.sup, self.theta_min, self.theta_max, self.link)
-        new_model.define_structure(seed = self.seed)
+        new_model.define_structure()
         new_model.set_weights(self.get_weights())
         return new_model
     
@@ -140,28 +141,45 @@ class MPScrModelStructure(keras.models.Model):
     def get_config(self):
         pass
     
-    @tf.function
-    def calculate_loss_weights_mean(self, r0, m, p0):
+    # @tf.function
+    def calculate_loss_weights_mean(self, r0, m, log_p0):
         '''
             A partir da razão r0 = a0/p0 e do vetor de variáveis latentes estimado, m, calcula
         '''
+
+        # print("r0: {}".format(r0.numpy().flatten()[:20]))
+        # print("log_p0: {}".format(log_p0.numpy().flatten()[:20]))
+        
         # Recupera os valores estimados de theta de cada indivíduo
         C_inv_r = self.C_inv(r0)
 
+        # print("C_inv_r: {}".format(C_inv_r.numpy().flatten()[:20]))
+
         # Obtém a expressão da verossimilhança desejada
-        loss_weights = m * self.log_phi(C_inv_r) + tf.math.log(p0)
+        loss_weights = m * self.log_phi(C_inv_r) + log_p0
+
+        # print("m: {}".format(m.numpy().flatten()[:20]))
+        # print("self.log_phi(C_inv_r): {}".format(self.log_phi(C_inv_r).numpy().flatten()[:20]))
+        # print("m * self.log_phi(C_inv_r): {}".format((m * self.log_phi(C_inv_r)).numpy().flatten()[:20]))
+        # print("log_p0: {}".format(log_p0.numpy().flatten()[:20]))
+
+        # print("SHAPE WEIGHTS: {}".format(loss_weights.shape))
+        # print("loss_weights: {}".format(loss_weights.numpy().flatten()[:20]))
+        
         # Adiciona à média das perdas as penalizações para o espaço paramétrico
         loss_weights_mean = -tf.math.reduce_mean(loss_weights)
+
+        # print("LOSS: {}".format(loss_weights_mean))
         
         return loss_weights_mean
     
     # Por alguma razão, inverte a ordem dos argumentos dada pelo data_generator
-    @tf.function
+    # @tf.function
     def loss_func(self, m, eta):
         log_a0 = self.log_a(tf.constant(0.0, dtype = tf.float64))
-        log_p0 = tf.math.log( self.link_func(eta) )
-        # p0 = 1/(1 + tf.math.exp(-eta))
-        # r0 = a0/p0
+        p0 = self.link_func(eta)
+        log_p0 = tf.math.log( p0 )
+        
         log_r0 = log_a0 - log_p0
         r0 = tf.math.exp(log_r0)
         
@@ -187,9 +205,14 @@ class MPScrModelStructure(keras.models.Model):
             parametric_space_penalty = mean_penalty_lower + mean_penalty_upper
 
         # Caso parametric_space_penalty = 0, calcula a perda com base na verossimilhança (primeiro lambda), caso contrário, usa a perda referente ao espaço paramétrico (segundo lambda)
+        # loss_value = tf.cond(
+        #     tf.equal(parametric_space_penalty, 0.0),  # Condition
+        #     lambda: self.calculate_loss_weights_mean(r0, m, p0),  # True branch
+        #     lambda: parametric_space_penalty # False branch
+        # )
         loss_value = tf.cond(
             tf.equal(parametric_space_penalty, 0.0),  # Condition
-            lambda: self.calculate_loss_weights_mean(r0, m, p0),  # True branch
+            lambda: self.calculate_loss_weights_mean(r0, m, log_p0),  # True branch
             lambda: parametric_space_penalty # False branch
         )
         
@@ -414,8 +437,9 @@ def update_m_mps(model, alpha, s, x, t, delta):
     
     log_a0 = model.log_a(tf.constant(0.0, dtype = tf.float64))
     eta_pred = model.predict(x, verbose = 0)
-    log_p0_pred = model.link_func(eta_pred)
-    # r_pred = a0 / p0_pred
+    
+    log_p0_pred = np.log( model.link_func(eta_pred) )
+
     log_r_pred = log_a0 - log_p0_pred
     r_pred = tf.math.exp(log_r_pred)
     
@@ -429,10 +453,15 @@ def update_m_mps(model, alpha, s, x, t, delta):
     
     # Para o cálculo da função para diferentes thetas, a função mps.pmf leva em conta shape broadcasting, comum ao numpy e ao tensorflow
     f_sup = mps.pmf(model.sup, model.log_a, new_log_phi, new_theta, model.sup)
+
+    # print("f_sup shape: {}".format(f_sup.shape))
+    
     E_M = np.sum(f_sup * model.sup, axis = 1)
     E_M2 = np.sum(f_sup * model.sup**2, axis = 1)
     new_m = E_M.copy()
     new_m[delta == 1] = E_M2[delta == 1] / E_M[delta == 1]
+
+    # print("new_m: {}".format(new_m[:20]))
     
     return new_m
 
@@ -440,6 +469,7 @@ def initialize_alpha_s(t, n_cuts = 6):
     alpha0 = np.ones(n_cuts + 1)
     qs = np.linspace(0, 1, n_cuts+1)[1:]
     s = np.quantile(t, qs)
+    s = np.concatenate([[0],s])
     return alpha0, s
 
 def save_EM_args(filename,
@@ -538,12 +568,13 @@ def call_EM(em_filename,
                   
     # CRIAR TODA A ESTRUTURA DOS DIRETÓRIOS, CASO NÃO EXISTA --- FAZER ISSO !!!
     data_dir = "EM_data"
+    Path("{}/model_history".format(data_dir)).mkdir(parents=True, exist_ok=True)
     
     # Limpa todos os arquivos da pasta EM_data
     clear_folder(data_dir)
     
     # Salva os pesos do modelo
-    model.save_model("{}/model.weights.h5".format(data_dir))
+    # model.save_model("{}/model.weights.h5".format(data_dir))
     # Salva o parâmetro alpha e seus nós s
     save_alpha_s(alpha, s, filename = "{}/alpha_s.csv".format(data_dir))
     # Salva os argumentos no arquivo EM_data/EM_args.json
@@ -574,6 +605,7 @@ def call_EM(em_filename,
 
     model_history = []
     model_history_count = len([name for name in os.listdir("{}/model_history".format(data_dir))])
+    
     # Percorre todos os modelos e salva os seus valores em variáveis
     for i in range(model_history_count):
         aux = model.copy()
