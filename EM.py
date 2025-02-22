@@ -6,7 +6,11 @@ import logging
 import numpy as np
 import pandas as pd
 
+# from silence_tensorflow import silence_tensorflow
+# silence_tensorflow()
 import tensorflow as tf
+import tensorflow_probability as tfp
+
 from tensorflow import keras
 from keras import models, layers, initializers, optimizers, losses
 from keras.callbacks import Callback
@@ -16,6 +20,7 @@ from tqdm import tqdm
 
 from net_model import *
 from custom_model import *
+from mps_models import *
 import pwexp
 import mps
 
@@ -32,8 +37,9 @@ log_a_str = func_args["log_a_str"]
 log_phi_str = func_args["log_phi_str"]
 C_str = func_args["C_str"]
 C_inv_str = func_args["C_inv_str"]
-B_str = func_args["B_str"]
 sup_str = func_args["sup_str"]
+theta_min = func_args["theta_min"]
+theta_max = func_args["theta_max"]
 
 max_iterations = func_args["max_iterations"]
 early_stopping_em = func_args["early_stopping_em"]
@@ -75,18 +81,18 @@ if(len(x_val.shape) == 0):
 else:
      x_val = tf.cast(x_val, dtype = tf.float64)
 
+
 # Cria as funções referentes ao modelo MPS para inicializar a rede neural
 log_a_tf = eval(log_a_str)
 log_phi_tf = eval(log_phi_str)
 C_tf = eval(C_str)
 C_inv_tf = eval(C_inv_str)
-B = eval(B_str)
 sup_tf = eval(sup_str)
-        
+
 # Carregamento do modelo
-model = MPScrModel(log_a_tf, log_phi_tf, C_tf, C_inv_tf, sup_tf)
+model = MPScrModel(log_a_tf, log_phi_tf, C_tf, C_inv_tf, sup_tf, theta_min, theta_max, "logit")
 model.define_structure(shape_input = x[0].shape)
-# model.load_model("{}/model.weights.h5".format(data_dir))
+model.load_model("{}/model.weights.h5".format(data_dir))
 
 # Carregamento do parâmetro inicial alpha e nós s
 alpha, s = load_alpha_s(filename = "{}/alpha_s.csv".format(data_dir))

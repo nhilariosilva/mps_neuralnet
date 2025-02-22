@@ -6,6 +6,11 @@ from time import time
 
 from scipy.special import comb, loggamma, lambertw
 
+# from silence_tensorflow import silence_tensorflow
+# silence_tensorflow()
+import tensorflow as tf
+import tensorflow_probability as tfp
+
 import mps
 import pwexp
 
@@ -25,12 +30,12 @@ log_phi_poisson_tf = lambda theta : tf.math.log(theta)
 C_poisson_tf = lambda theta : tf.math.exp(theta)
 C_inv_poisson_tf = lambda u : tf.math.log(u)
 sup_poisson = np.arange(0, B, 1).astype(np.float64)
-# Versões para o EM
-log_a_poisson_str = "lambda m : -tf.math.lgamma(m+1)"
-log_phi_poisson_str = "lambda theta : tf.math.log(theta)"
-C_poisson_str = "lambda theta : tf.math.exp(theta)"
-C_inv_poisson_str = "lambda u : tf.math.log(u)"
-sup_poisson_str = "np.arange(0, B, 1).astype(np.float64)"
+# Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
+log_a_poisson_str = "log_a_poisson_tf"
+log_phi_poisson_str = "log_phi_poisson_tf"
+C_poisson_str = "C_poisson_tf"
+C_inv_poisson_str = "C_inv_poisson_tf"
+sup_poisson_str = "sup_poisson"
 
 theta_min_poisson = None
 theta_max_poisson = None
@@ -52,6 +57,12 @@ log_phi_log_tf = lambda theta : tf.math.log(theta)
 C_log_tf = lambda theta : -tf.math.log(1-theta)/theta
 C_inv_log_tf = lambda u : 1 + tfp.math.lambertw(-u*tf.math.exp(-u)) / u
 sup_log = np.arange(0, B, 1).astype(np.float64)
+# Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
+log_a_log_str = "log_a_log_tf"
+log_phi_log_str = "log_phi_log_tf"
+C_log_str = "C_log_tf"
+C_inv_log_str = "C_inv_log_tf"
+sup_log_str = "sup_log"
 
 theta_min_log = 0
 theta_max_log = 1
@@ -81,6 +92,12 @@ def C_nb_tf(q):
 def C_inv_nb_tf(q):
     return lambda u : u**(-1/q)
 sup_nb = np.arange(0, B, 1).astype(np.float64)
+# Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
+log_a_nb_str = "log_a_nb_tf({})"
+log_phi_nb_str = "log_phi_nb_tf({})"
+C_nb_str = "C_nb_tf({})"
+C_inv_nb_str = "C_inv_nb_tf({})"
+sup_nb_str = "sup_nb"
 
 theta_min_nb = 0
 theta_max_nb = 1
@@ -111,6 +128,12 @@ def C_mvnb_tf(q):
 def C_inv_mvnb_tf(q):
     return lambda u : (u**q - 1) / q
 sup_mvnb = np.arange(0, B, 1).astype(np.float64)
+# Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
+log_a_mvnb_str = "log_a_mvnb_tf({})"
+log_phi_mvnb_str = "log_phi_mvnb_tf({})"
+C_mvnb_str = "C_mvnb_tf({})"
+C_inv_mvnb_str = "C_inv_mvnb_tf({})"
+sup_mvnb_str = "sup_mvnb"
 
 theta_min_mvnb = None
 theta_max_mvnb = None
@@ -141,6 +164,12 @@ def C_inv_bin_tf(q):
     return lambda u : 1 - u**(-1/q)
 def sup_bin(q):
     return np.arange(0, q+1, 1).astype(np.float64)
+# Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
+log_a_bin_str = "log_a_bin_tf({})"
+log_phi_bin_str = "log_phi_bin_tf({})"
+C_bin_str = "C_bin_tf({})"
+C_inv_bin_str = "C_inv_bin_tf({})"
+sup_bin_str = "sup_bin({})"
 
 theta_min_bin = 0
 theta_max_bin = 1
@@ -200,6 +229,12 @@ def sup_rgp(q):
         max_sup_candidates = np.arange(1, 101)
         max_sup = max_sup_candidates[(1 + max_sup_candidates*q) > 0][-1]
         return np.arange(max_sup+1)
+# Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
+log_a_rgp_str = "log_a_rgp_tf({})"
+log_phi_rgp_str = "log_phi_rgp_tf({})"
+C_rgp_str = "C_rgp_tf({})"
+C_inv_rgp_str = "C_inv_rgp_tf({})"
+sup_rgp_str = "sup_rgp({})"
 
 theta_min_rgp = 0
 # The RGP theta parameter must be lesser than q, otherwise its probabilities do not sum to one
@@ -258,6 +293,12 @@ def C_geeta_tf(q):
 def C_inv_geeta_tf(q):
     return lambda u : 1 - u**(1/(1-q))
 sup_geeta = np.arange(0, B, 1).astype(np.float64)
+# Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
+log_a_geeta_str = "log_a_geeta_tf({})"
+log_phi_geeta_str = "log_phi_geeta_tf({})"
+C_geeta_str = "C_geeta_tf({})"
+C_inv_geeta_str = "C_inv_geeta_tf({})"
+sup_geeta_str = "sup_geeta"
 
 theta_min_geeta = 0
 theta_max_geeta = lambda q : 1/q
@@ -269,3 +310,5 @@ def Var_geeta(q, theta):
     p = theta
     s = 1-p
     return p*s*(q-1)/(s-p*(q-1))**2 + p**2*s*(q-1)*q/(s-p*(q-1))**3
+
+    

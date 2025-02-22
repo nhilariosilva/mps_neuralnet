@@ -96,7 +96,19 @@ class MPScrModelStructure(keras.models.Model):
             self.r_min = np.min([C_theta_min, C_theta_max])
             self.r_max = np.max([C_theta_min, C_theta_max])
             self.r_mid = (self.r_min + self.r_max)/2
-            
+
+            # Se o r mínimo for 1 e o máximo for infinito, então mesmo havendo uma restrição em theta, não há uma restrição na probabilidade de cura, seguindo normalmente o processo de estimação
+            if( (self.r_min-1.0)<1.0e-12 and tf.math.is_inf(self.r_max)):
+                self.r_min = None
+                self.r_max = None
+                self.r_mid = None
+            else:
+                # A probabilidade associada ao maior valor da razão r = a_0 / p_0 é a menor probabilidade e a associada ao menor r é a maior probabilidade (inversamente proporcional) 
+                p_theta_max = tf.math.exp( self.log_a(tf.constant(0.0, dtype = tf.float64)) - tf.math.log(tf.constant(C_theta_min, dtype = tf.float64)) )
+                # Obtém a probabilidade p associada ao maior valor de C(theta)
+                p_theta_min = tf.math.exp( self.log_a(tf.constant(0.0, dtype = tf.float64)) - tf.math.log(tf.constant(C_theta_max, dtype = tf.float64)) )
+                print("Warning: The cure probability for this model lies between {:.6f} and {:.6f}".format(float(p_theta_min), float(p_theta_max)))
+        
     def define_structure(self):
         '''
             Define toda a estrutura da rede neural. Caso tenha o interesse em modificar a estrutura do modelo, deverá ser criada uma nova classe que herda MPScrModelStructure e atualizar essa função, além da função call e copy.
@@ -473,7 +485,7 @@ def initialize_alpha_s(t, n_cuts = 6):
     return alpha0, s
 
 def save_EM_args(filename,
-                 log_a_str, log_phi_str, C_str, C_inv_str, B_str, sup_str,
+                 log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max,
                  max_iterations = 30, early_stopping_em = True, early_stopping_em_warmup = 5, early_stopping_em_eps = 100,
                  epochs = 100, batch_size = None, shuffle = False,
                  learning_rate = 0.01, run_eagerly = False,
@@ -486,8 +498,9 @@ def save_EM_args(filename,
         "log_phi_str": log_phi_str,
         "C_str": C_str,
         "C_inv_str": C_inv_str,
-        "B_str": B_str,
         "sup_str": sup_str,
+        "theta_min": theta_min,
+        "theta_max": theta_max,
         "max_iterations": max_iterations,
         "early_stopping_em": early_stopping_em,
         "early_stopping_em_warmup": early_stopping_em_warmup,
@@ -553,7 +566,7 @@ def clear_folder(folder):
                   
     
 def call_EM(em_filename,
-            log_a_str, log_phi_str, C_str, C_inv_str, B_str, sup_str,
+            log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max,
             model, alpha, s,
             x, t, delta, m,
             max_iterations = 30,
@@ -574,12 +587,12 @@ def call_EM(em_filename,
     clear_folder(data_dir)
     
     # Salva os pesos do modelo
-    # model.save_model("{}/model.weights.h5".format(data_dir))
+    model.save_model("{}/model.weights.h5".format(data_dir))
     # Salva o parâmetro alpha e seus nós s
     save_alpha_s(alpha, s, filename = "{}/alpha_s.csv".format(data_dir))
     # Salva os argumentos no arquivo EM_data/EM_args.json
     save_EM_args("EM_data/EM_args.json",
-                 log_a_str, log_phi_str, C_str, C_inv_str, B_str, sup_str,
+                 log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max,
                  max_iterations = max_iterations, early_stopping_em = early_stopping_em,
                  early_stopping_em_warmup = early_stopping_em_warmup, early_stopping_em_eps = early_stopping_em_eps,
                  epochs = epochs, batch_size = batch_size, shuffle = shuffle,
