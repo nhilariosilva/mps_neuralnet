@@ -17,6 +17,9 @@ from tqdm import tqdm
 import mps
 import pwexp
 
+import os, shutil
+from pathlib import Path
+
 tf.keras.backend.set_floatx('float64')
 
 def set_all_seeds(seed=42):
@@ -27,6 +30,9 @@ def set_all_seeds(seed=42):
     tf.random.set_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+    # Ensure deterministic operations on GPU
+    tf.config.experimental.enable_op_determinism()
 
 def vec_weights(model):
     '''
@@ -64,7 +70,7 @@ class CustomCallback(keras.callbacks.Callback):
         self.model.training_started = True
     
 class MPScrModelStructure(keras.models.Model):    
-    def __init__(self, log_a, log_phi, C, C_inv, sup, theta_min = None, theta_max = None, link = "logit"):
+    def __init__(self, log_a, log_phi, C, C_inv, sup, theta_min = None, theta_max = None, link = "logit", verbose = 0):
         super().__init__()
         # Salva as funções referentes ao modelo MPScr
         self.log_a = log_a
@@ -93,13 +99,24 @@ class MPScrModelStructure(keras.models.Model):
             self.r_min = np.min([C_theta_min, C_theta_max])
             self.r_max = np.max([C_theta_min, C_theta_max])
             self.r_mid = (self.r_min + self.r_max)/2
-            
-    def define_structure(self, seed = 42):
+
+            # Se o r mínimo for 1 e o máximo for infinito, então mesmo havendo uma restrição em theta, não há uma restrição na probabilidade de cura, seguindo normalmente o processo de estimação
+            if( (self.r_min-1.0)<1.0e-12 and tf.math.is_inf(self.r_max)):
+                self.r_min = None
+                self.r_max = None
+                self.r_mid = None
+            else:
+                # A probabilidade associada ao maior valor da razão r = a_0 / p_0 é a menor probabilidade e a associada ao menor r é a maior probabilidade (inversamente proporcional) 
+                p_theta_max = tf.math.exp( self.log_a(tf.constant(0.0, dtype = tf.float64)) - tf.math.log(tf.constant(C_theta_min, dtype = tf.float64)) )
+                # Obtém a probabilidade p associada ao maior valor de C(theta)
+                p_theta_min = tf.math.exp( self.log_a(tf.constant(0.0, dtype = tf.float64)) - tf.math.log(tf.constant(C_theta_max, dtype = tf.float64)) )
+                if(verbose > 0):
+                    print("******* Warning: The cure probability for this model lies between {:.6f} and {:.6f} *******".format(float(p_theta_min), float(p_theta_max)))
+        
+    def define_structure(self, seed = 1):
         '''
             Define toda a estrutura da rede neural. Caso tenha o interesse em modificar a estrutura do modelo, deverá ser criada uma nova classe que herda MPScrModelStructure e atualizar essa função, além da função call e copy.
         '''
-        self.seed = seed
-    
         # Por padrão, supõe que o modelo recebe vetores unidimensionais
         self.shape_input = (1,)
         dummy_input = np.zeros(self.shape_input)
@@ -126,7 +143,7 @@ class MPScrModelStructure(keras.models.Model):
     def copy(self):
         # Cria um objeto da mesma classe, passando os parâmetros do objeto atual como inputs
         new_model = MPScrModelStructure(self.log_a, self.log_phi, self.C, self.C_inv, self.sup, self.theta_min, self.theta_max, self.link)
-        new_model.define_structure(seed = self.seed)
+        new_model.define_structure()
         new_model.set_weights(self.get_weights())
         return new_model
     
@@ -141,27 +158,25 @@ class MPScrModelStructure(keras.models.Model):
         pass
     
     @tf.function
-    def calculate_loss_weights_mean(self, r0, m, p0):
+    def calculate_loss_weights_mean(self, r0, m, log_p0):
         '''
             A partir da razão r0 = a0/p0 e do vetor de variáveis latentes estimado, m, calcula
         '''
         # Recupera os valores estimados de theta de cada indivíduo
         C_inv_r = self.C_inv(r0)
-
         # Obtém a expressão da verossimilhança desejada
-        loss_weights = m * self.log_phi(C_inv_r) + tf.math.log(p0)
+        loss_weights = m * self.log_phi(C_inv_r) + log_p0
         # Adiciona à média das perdas as penalizações para o espaço paramétrico
         loss_weights_mean = -tf.math.reduce_mean(loss_weights)
-        
         return loss_weights_mean
     
     # Por alguma razão, inverte a ordem dos argumentos dada pelo data_generator
     @tf.function
     def loss_func(self, m, eta):
         log_a0 = self.log_a(tf.constant(0.0, dtype = tf.float64))
-        log_p0 = tf.math.log( self.link_func(eta) )
-        # p0 = 1/(1 + tf.math.exp(-eta))
-        # r0 = a0/p0
+        p0 = self.link_func(eta)
+        log_p0 = tf.math.log( p0 )
+        
         log_r0 = log_a0 - log_p0
         r0 = tf.math.exp(log_r0)
         
@@ -187,9 +202,14 @@ class MPScrModelStructure(keras.models.Model):
             parametric_space_penalty = mean_penalty_lower + mean_penalty_upper
 
         # Caso parametric_space_penalty = 0, calcula a perda com base na verossimilhança (primeiro lambda), caso contrário, usa a perda referente ao espaço paramétrico (segundo lambda)
+        # loss_value = tf.cond(
+        #     tf.equal(parametric_space_penalty, 0.0),  # Condition
+        #     lambda: self.calculate_loss_weights_mean(r0, m, p0),  # True branch
+        #     lambda: parametric_space_penalty # False branch
+        # )
         loss_value = tf.cond(
             tf.equal(parametric_space_penalty, 0.0),  # Condition
-            lambda: self.calculate_loss_weights_mean(r0, m, p0),  # True branch
+            lambda: self.calculate_loss_weights_mean(r0, m, log_p0),  # True branch
             lambda: parametric_space_penalty # False branch
         )
         
@@ -414,8 +434,9 @@ def update_m_mps(model, alpha, s, x, t, delta):
     
     log_a0 = model.log_a(tf.constant(0.0, dtype = tf.float64))
     eta_pred = model.predict(x, verbose = 0)
-    log_p0_pred = model.link_func(eta_pred)
-    # r_pred = a0 / p0_pred
+    
+    log_p0_pred = np.log( model.link_func(eta_pred) )
+
     log_r_pred = log_a0 - log_p0_pred
     r_pred = tf.math.exp(log_r_pred)
     
@@ -429,10 +450,15 @@ def update_m_mps(model, alpha, s, x, t, delta):
     
     # Para o cálculo da função para diferentes thetas, a função mps.pmf leva em conta shape broadcasting, comum ao numpy e ao tensorflow
     f_sup = mps.pmf(model.sup, model.log_a, new_log_phi, new_theta, model.sup)
+
+    # print("f_sup shape: {}".format(f_sup.shape))
+    
     E_M = np.sum(f_sup * model.sup, axis = 1)
     E_M2 = np.sum(f_sup * model.sup**2, axis = 1)
     new_m = E_M.copy()
     new_m[delta == 1] = E_M2[delta == 1] / E_M[delta == 1]
+
+    # print("new_m: {}".format(new_m[:20]))
     
     return new_m
 
@@ -440,24 +466,26 @@ def initialize_alpha_s(t, n_cuts = 6):
     alpha0 = np.ones(n_cuts + 1)
     qs = np.linspace(0, 1, n_cuts+1)[1:]
     s = np.quantile(t, qs)
+    s = np.concatenate([[0],s])
     return alpha0, s
 
 def save_EM_args(filename,
-                 log_a_str, log_phi_str, C_str, C_inv_str, B_str, sup_str,
+                 log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max,
                  max_iterations = 30, early_stopping_em = True, early_stopping_em_warmup = 5, early_stopping_em_eps = 100,
                  epochs = 100, batch_size = None, shuffle = False,
                  learning_rate = 0.01, run_eagerly = False,
                  early_stopping_nn = True, early_stopping_min_delta_nn = 0.0, early_stopping_patience_nn = 5,
                  reduce_lr = True, reduce_lr_steps = 10, reduce_lr_factor = 0.1,
                  validation = False, val_prop = None,
-                 verbose = 2, alpha_known = False):
+                 verbose = 2, seed = 1, alpha_known = False):
     func_args = {
         "log_a_str": log_a_str,
         "log_phi_str": log_phi_str,
         "C_str": C_str,
         "C_inv_str": C_inv_str,
-        "B_str": B_str,
         "sup_str": sup_str,
+        "theta_min": theta_min,
+        "theta_max": theta_max,
         "max_iterations": max_iterations,
         "early_stopping_em": early_stopping_em,
         "early_stopping_em_warmup": early_stopping_em_warmup,
@@ -476,6 +504,7 @@ def save_EM_args(filename,
         "validation": validation,
         "val_prop": val_prop,
         "verbose": verbose,
+        "seed": seed,
         "alpha_known": alpha_known
     }
     with open(filename, "w") as args_file:
@@ -523,8 +552,8 @@ def clear_folder(folder):
                   
     
 def call_EM(em_filename,
-            log_a_str, log_phi_str, C_str, C_inv_str, B_str, sup_str,
-            model, alpha, s,
+            log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max,
+            dummy_model, alpha, s,
             x, t, delta, m,
             max_iterations = 30,
             early_stopping_em = True, early_stopping_em_warmup = 5, early_stopping_em_eps = 1.0e-6,
@@ -534,21 +563,21 @@ def call_EM(em_filename,
             reduce_lr = False, reduce_lr_steps = 30, reduce_lr_factor = 0.1,
             validation = False, val_prop = 0.2,
             x_val = None, t_val = None, delta_val = None, m_val = None,
-            verbose = 1, alpha_known = False):
+            verbose = 1, seed = 1, alpha_known = False):
                   
-    # CRIAR TODA A ESTRUTURA DOS DIRETÓRIOS, CASO NÃO EXISTA --- FAZER ISSO !!!
     data_dir = "EM_data"
+    Path("{}/model_history".format(data_dir)).mkdir(parents=True, exist_ok=True)
     
     # Limpa todos os arquivos da pasta EM_data
     clear_folder(data_dir)
-    
+
     # Salva os pesos do modelo
-    model.save_model("{}/model.weights.h5".format(data_dir))
+    dummy_model.save_model("{}/model.weights.h5".format(data_dir))
     # Salva o parâmetro alpha e seus nós s
     save_alpha_s(alpha, s, filename = "{}/alpha_s.csv".format(data_dir))
     # Salva os argumentos no arquivo EM_data/EM_args.json
     save_EM_args("EM_data/EM_args.json",
-                 log_a_str, log_phi_str, C_str, C_inv_str, B_str, sup_str,
+                 log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max,
                  max_iterations = max_iterations, early_stopping_em = early_stopping_em,
                  early_stopping_em_warmup = early_stopping_em_warmup, early_stopping_em_eps = early_stopping_em_eps,
                  epochs = epochs, batch_size = batch_size, shuffle = shuffle,
@@ -556,7 +585,7 @@ def call_EM(em_filename,
                  early_stopping_nn = early_stopping_nn, early_stopping_min_delta_nn = early_stopping_min_delta_nn, early_stopping_patience_nn = early_stopping_patience_nn,
                  reduce_lr = reduce_lr, reduce_lr_steps = reduce_lr_steps, reduce_lr_factor = reduce_lr_factor,
                  validation = validation, val_prop = val_prop,
-                 verbose = verbose, alpha_known = alpha_known)
+                 verbose = verbose, seed = seed, alpha_known = alpha_known)
 
     # Arquivos .npz não reconhecem o tipo None, por isso a conversão para a string "None"
     if(x_val is None):
@@ -568,19 +597,29 @@ def call_EM(em_filename,
              x = x, t = t, delta = delta, m = m,
              x_val = x_val, t_val = t_val, delta_val = delta_val, m_val = m_val)
 
-    subprocess_result = subprocess.run(
-        ["python3", em_filename]
-    )
+    if(verbose > 0):
+        subprocess_result = subprocess.run(
+            ["python3", em_filename]
+        )
+    else:
+        # If verbose = 0, supresses all possible outputs from the file
+        subprocess_result = subprocess.run(
+            ["python3", em_filename],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
 
     model_history = []
     model_history_count = len([name for name in os.listdir("{}/model_history".format(data_dir))])
+
     # Percorre todos os modelos e salva os seus valores em variáveis
     for i in range(model_history_count):
-        aux = model.copy()
+        aux = dummy_model.copy()
         aux.load_model("{}/model_history/new_model_{}.weights.h5".format(data_dir, i+1))
         model_history.append(aux)
-        
-    print("Número de arquivos no diretório: {}".format(model_history_count))
+
+    if(verbose > 0):
+        print("Número de arquivos no diretório: {}".format(model_history_count))
 
     results_alpha = np.load("{}/EM_results.npz".format(data_dir))
     alpha_history = results_alpha["alpha_history"]
@@ -591,7 +630,11 @@ def call_EM(em_filename,
         "new_alpha": alpha_history[-1],
         "alpha_history": alpha_history,
         "m_history": results_alpha["m_history"],
-        "m_val_history": results_alpha["m_val_history"]
+        "m_val_history": results_alpha["m_val_history"],
+        "converged": results_alpha["converged"],
+        "steps": results_alpha["steps"],
+        "loss_history": results_alpha["loss_history"],
+        "loss_val_history": results_alpha["loss_val_history"],
     }
 
     return results
