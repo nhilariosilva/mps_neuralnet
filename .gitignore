@@ -2,4 +2,4 @@
 # *.csv
 __pycache__/
 .ipynb_checkpoints/
-*.h5
+EM_data/*

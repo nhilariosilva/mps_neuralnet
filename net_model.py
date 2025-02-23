@@ -31,6 +31,9 @@ def set_all_seeds(seed=42):
     np.random.seed(seed)
     random.seed(seed)
 
+    # Ensure deterministic operations on GPU
+    tf.config.experimental.enable_op_determinism()
+
 def vec_weights(model):
     '''
         Dado um modelo de redes neuras, achata todos os parâmetros da rede em um único vetor e o retorna.
@@ -67,7 +70,7 @@ class CustomCallback(keras.callbacks.Callback):
         self.model.training_started = True
     
 class MPScrModelStructure(keras.models.Model):    
-    def __init__(self, log_a, log_phi, C, C_inv, sup, theta_min = None, theta_max = None, link = "logit"):
+    def __init__(self, log_a, log_phi, C, C_inv, sup, theta_min = None, theta_max = None, link = "logit", verbose = 0):
         super().__init__()
         # Salva as funções referentes ao modelo MPScr
         self.log_a = log_a
@@ -107,9 +110,10 @@ class MPScrModelStructure(keras.models.Model):
                 p_theta_max = tf.math.exp( self.log_a(tf.constant(0.0, dtype = tf.float64)) - tf.math.log(tf.constant(C_theta_min, dtype = tf.float64)) )
                 # Obtém a probabilidade p associada ao maior valor de C(theta)
                 p_theta_min = tf.math.exp( self.log_a(tf.constant(0.0, dtype = tf.float64)) - tf.math.log(tf.constant(C_theta_max, dtype = tf.float64)) )
-                print("Warning: The cure probability for this model lies between {:.6f} and {:.6f}".format(float(p_theta_min), float(p_theta_max)))
+                if(verbose > 0):
+                    print("******* Warning: The cure probability for this model lies between {:.6f} and {:.6f} *******".format(float(p_theta_min), float(p_theta_max)))
         
-    def define_structure(self):
+    def define_structure(self, seed = 1):
         '''
             Define toda a estrutura da rede neural. Caso tenha o interesse em modificar a estrutura do modelo, deverá ser criada uma nova classe que herda MPScrModelStructure e atualizar essa função, além da função call e copy.
         '''
@@ -120,7 +124,7 @@ class MPScrModelStructure(keras.models.Model):
 
         # Declara a estrutura do modelo de redes neurais.
         # Por padrão é um simples modelo denso com 10 neurônios na camada oculta.
-        initializer = initializers.HeNormal()
+        initializer = initializers.HeNormal(seed = seed)
         self.in_layer = layers.InputLayer(input_shape = (1,))
         self.dense1 = layers.Dense(10, activation = keras.activations.sigmoid, kernel_initializer = initializer)
         self.out_layer = layers.Dense(1, activation = None, use_bias = False, kernel_initializer = initializer)
@@ -153,40 +157,21 @@ class MPScrModelStructure(keras.models.Model):
     def get_config(self):
         pass
     
-    # @tf.function
+    @tf.function
     def calculate_loss_weights_mean(self, r0, m, log_p0):
         '''
             A partir da razão r0 = a0/p0 e do vetor de variáveis latentes estimado, m, calcula
         '''
-
-        # print("r0: {}".format(r0.numpy().flatten()[:20]))
-        # print("log_p0: {}".format(log_p0.numpy().flatten()[:20]))
-        
         # Recupera os valores estimados de theta de cada indivíduo
         C_inv_r = self.C_inv(r0)
-
-        # print("C_inv_r: {}".format(C_inv_r.numpy().flatten()[:20]))
-
         # Obtém a expressão da verossimilhança desejada
         loss_weights = m * self.log_phi(C_inv_r) + log_p0
-
-        # print("m: {}".format(m.numpy().flatten()[:20]))
-        # print("self.log_phi(C_inv_r): {}".format(self.log_phi(C_inv_r).numpy().flatten()[:20]))
-        # print("m * self.log_phi(C_inv_r): {}".format((m * self.log_phi(C_inv_r)).numpy().flatten()[:20]))
-        # print("log_p0: {}".format(log_p0.numpy().flatten()[:20]))
-
-        # print("SHAPE WEIGHTS: {}".format(loss_weights.shape))
-        # print("loss_weights: {}".format(loss_weights.numpy().flatten()[:20]))
-        
         # Adiciona à média das perdas as penalizações para o espaço paramétrico
         loss_weights_mean = -tf.math.reduce_mean(loss_weights)
-
-        # print("LOSS: {}".format(loss_weights_mean))
-        
         return loss_weights_mean
     
     # Por alguma razão, inverte a ordem dos argumentos dada pelo data_generator
-    # @tf.function
+    @tf.function
     def loss_func(self, m, eta):
         log_a0 = self.log_a(tf.constant(0.0, dtype = tf.float64))
         p0 = self.link_func(eta)
@@ -492,7 +477,7 @@ def save_EM_args(filename,
                  early_stopping_nn = True, early_stopping_min_delta_nn = 0.0, early_stopping_patience_nn = 5,
                  reduce_lr = True, reduce_lr_steps = 10, reduce_lr_factor = 0.1,
                  validation = False, val_prop = None,
-                 verbose = 2, alpha_known = False):
+                 verbose = 2, seed = 1, alpha_known = False):
     func_args = {
         "log_a_str": log_a_str,
         "log_phi_str": log_phi_str,
@@ -519,6 +504,7 @@ def save_EM_args(filename,
         "validation": validation,
         "val_prop": val_prop,
         "verbose": verbose,
+        "seed": seed,
         "alpha_known": alpha_known
     }
     with open(filename, "w") as args_file:
@@ -567,7 +553,7 @@ def clear_folder(folder):
     
 def call_EM(em_filename,
             log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max,
-            model, alpha, s,
+            dummy_model, alpha, s,
             x, t, delta, m,
             max_iterations = 30,
             early_stopping_em = True, early_stopping_em_warmup = 5, early_stopping_em_eps = 1.0e-6,
@@ -577,17 +563,16 @@ def call_EM(em_filename,
             reduce_lr = False, reduce_lr_steps = 30, reduce_lr_factor = 0.1,
             validation = False, val_prop = 0.2,
             x_val = None, t_val = None, delta_val = None, m_val = None,
-            verbose = 1, alpha_known = False):
+            verbose = 1, seed = 1, alpha_known = False):
                   
-    # CRIAR TODA A ESTRUTURA DOS DIRETÓRIOS, CASO NÃO EXISTA --- FAZER ISSO !!!
     data_dir = "EM_data"
     Path("{}/model_history".format(data_dir)).mkdir(parents=True, exist_ok=True)
     
     # Limpa todos os arquivos da pasta EM_data
     clear_folder(data_dir)
-    
+
     # Salva os pesos do modelo
-    model.save_model("{}/model.weights.h5".format(data_dir))
+    dummy_model.save_model("{}/model.weights.h5".format(data_dir))
     # Salva o parâmetro alpha e seus nós s
     save_alpha_s(alpha, s, filename = "{}/alpha_s.csv".format(data_dir))
     # Salva os argumentos no arquivo EM_data/EM_args.json
@@ -600,7 +585,7 @@ def call_EM(em_filename,
                  early_stopping_nn = early_stopping_nn, early_stopping_min_delta_nn = early_stopping_min_delta_nn, early_stopping_patience_nn = early_stopping_patience_nn,
                  reduce_lr = reduce_lr, reduce_lr_steps = reduce_lr_steps, reduce_lr_factor = reduce_lr_factor,
                  validation = validation, val_prop = val_prop,
-                 verbose = verbose, alpha_known = alpha_known)
+                 verbose = verbose, seed = seed, alpha_known = alpha_known)
 
     # Arquivos .npz não reconhecem o tipo None, por isso a conversão para a string "None"
     if(x_val is None):
@@ -612,20 +597,29 @@ def call_EM(em_filename,
              x = x, t = t, delta = delta, m = m,
              x_val = x_val, t_val = t_val, delta_val = delta_val, m_val = m_val)
 
-    subprocess_result = subprocess.run(
-        ["python3", em_filename]
-    )
+    if(verbose > 0):
+        subprocess_result = subprocess.run(
+            ["python3", em_filename]
+        )
+    else:
+        # If verbose = 0, supresses all possible outputs from the file
+        subprocess_result = subprocess.run(
+            ["python3", em_filename],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
 
     model_history = []
     model_history_count = len([name for name in os.listdir("{}/model_history".format(data_dir))])
-    
+
     # Percorre todos os modelos e salva os seus valores em variáveis
     for i in range(model_history_count):
-        aux = model.copy()
+        aux = dummy_model.copy()
         aux.load_model("{}/model_history/new_model_{}.weights.h5".format(data_dir, i+1))
         model_history.append(aux)
-        
-    print("Número de arquivos no diretório: {}".format(model_history_count))
+
+    if(verbose > 0):
+        print("Número de arquivos no diretório: {}".format(model_history_count))
 
     results_alpha = np.load("{}/EM_results.npz".format(data_dir))
     alpha_history = results_alpha["alpha_history"]
@@ -636,7 +630,11 @@ def call_EM(em_filename,
         "new_alpha": alpha_history[-1],
         "alpha_history": alpha_history,
         "m_history": results_alpha["m_history"],
-        "m_val_history": results_alpha["m_val_history"]
+        "m_val_history": results_alpha["m_val_history"],
+        "converged": results_alpha["converged"],
+        "steps": results_alpha["steps"],
+        "loss_history": results_alpha["loss_history"],
+        "loss_val_history": results_alpha["loss_val_history"],
     }
 
     return results

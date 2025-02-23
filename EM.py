@@ -6,8 +6,8 @@ import logging
 import numpy as np
 import pandas as pd
 
-# from silence_tensorflow import silence_tensorflow
-# silence_tensorflow()
+from silence_tensorflow import silence_tensorflow
+silence_tensorflow()
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -59,7 +59,10 @@ reduce_lr_factor = func_args["reduce_lr_factor"]
 validation = func_args["validation"]
 val_prop = func_args["val_prop"]
 verbose = func_args["verbose"]
+seed = func_args["seed"]
 alpha_known = func_args["alpha_known"]
+
+set_all_seeds(seed)
 
 # Carregamento dos dados de treinamento e validação iniciais
 data = np.load("{}/data.npz".format(data_dir))
@@ -89,7 +92,7 @@ C_tf = eval(C_str)
 C_inv_tf = eval(C_inv_str)
 sup_tf = eval(sup_str)
 
-# Carregamento do modelo
+# Carregamento do modelo - Os pesos são os mesmos do modelo inicial recebido como argumento
 model = MPScrModel(log_a_tf, log_phi_tf, C_tf, C_inv_tf, sup_tf, theta_min, theta_max, "logit")
 model.define_structure(shape_input = x[0].shape)
 model.load_model("{}/model.weights.h5".format(data_dir))
@@ -181,13 +184,14 @@ for i in range(max_iterations):
     # Verifica se o critério de parada já foi alcançado
     if(early_stopping_em and i >= early_stopping_em_warmup):
         if(distance < early_stopping_em_eps):
-            print("Algoritmo convergiu após {} iterações. Retornando.".format(i+1))
+            if(verbose > 0):
+                print("Algoritmo convergiu após {} iterações. Retornando.".format(i+1))
             new_model.save_model("{}/new_model.weights.h5".format(data_dir))
             alpha_history = np.array(alpha_history)
             m_history = np.array(m_history)
             m_val_history = np.array(m_val_history)
             distances = np.array(distances)
-            np.savez("{}/EM_results.npz".format(data_dir), alpha_history = alpha_history, m_history = m_history, m_val_history = m_val_history, distances = distances)
+            np.savez("{}/EM_results.npz".format(data_dir), alpha_history = alpha_history, m_history = m_history, m_val_history = m_val_history, distances = distances, converged = True, steps = i+1, loss_history = loss_values_train, loss_val_history = loss_values_val)
             # Encerra o programa
             sys.exit()
     
@@ -196,12 +200,13 @@ for i in range(max_iterations):
     alpha = new_alpha.copy()
     m_pred = new_m.copy()
 
-print("Algoritmo não convergiu após {} iterações. Retornando.".format(max_iterations))
+if(verbose > 0):
+    print("Algoritmo não convergiu após {} iterações. Retornando.".format(max_iterations))
 new_model.save_model("{}/new_model.weights.h5".format(data_dir))
 alpha_history = np.array(alpha_history)
 m_history = np.array(m_history)
 distances = np.array(distances)
-np.savez("{}/EM_results.npz".format(data_dir), alpha_history = alpha_history, m_history = m_history, m_val_history = m_val_history, distances = distances)
+np.savez("{}/EM_results.npz".format(data_dir), alpha_history = alpha_history, m_history = m_history, m_val_history = m_val_history, distances = distances, converged = False, steps = i+1, loss_history = loss_values_train, loss_val_history = loss_values_val)
 # Encerra o programa
 sys.exit()
 

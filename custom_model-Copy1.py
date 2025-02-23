@@ -12,13 +12,13 @@ class MPScrModel(MPScrModelStructure):
         self.shape_input = shape_input
         
         # Gera uma imagem inteira de zeros com as dimensões do modelo
-        dummy_input = keras.layers.Input(shape = self.shape_input)
+        dummy_input = np.zeros((1,) + self.shape_input)
         
         # initializer = initializers.HeNormal(seed = seed)
         initializer = tf.random_normal_initializer(stddev = 0.005)
-        
+
         self.convolution1 = keras.layers.Conv2D(filters = 4, kernel_size = [5,5], padding = "same", activation = tf.nn.leaky_relu,
-                                                kernel_initializer = initializer, dtype = tf.float32)
+                                                kernel_initializer = initializer, dtype = tf.float32, input_shape = self.shape_input)
         self.pooling1 = keras.layers.MaxPool2D(pool_size = [2,2], strides = 2)
         self.convolution2 = keras.layers.Conv2D(filters = 12, kernel_size = [5,5], padding = "same", activation = tf.nn.leaky_relu,
                                                 kernel_initializer = initializer, dtype = tf.float32)
@@ -30,8 +30,7 @@ class MPScrModel(MPScrModelStructure):
         self.flatten = keras.layers.Reshape(target_shape=(-1,))
         self.dense1 = keras.layers.Dense(units = 128, activation = tf.nn.tanh, dtype = tf.float32)
         self.dense2 = keras.layers.Dense(dtype = tf.float32, units = 1, activation = None, use_bias = False)
-
-        # Initialize the model weights (if not called beforehand, the method .get_weights() returns an empty list)
+        
         self(dummy_input)
         
     def call(self, x_input):
