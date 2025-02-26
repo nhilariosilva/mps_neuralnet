@@ -138,7 +138,7 @@ def select_model(distribution, q):
         sup_str = sup_mvnb_str.format(q_argument)
         theta_min = None
         theta_max = None
-    elif(distribution == "binomial"): 
+    elif(distribution == "bin" or distribution == "binomial"): 
         if(q is None):
             raise Exception("Please, specify the fixed parameter (q) for the distribution.")
         # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
@@ -262,16 +262,18 @@ for dist in dists_scenario2:
     Path("SimulationResults/Scenario2/n1000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
     Path("SimulationResults/Scenario2/n3000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
 
-
-def run_scenario(data_dir, distribution, q, train_images, test_images, seed = 1):
+def run_scenario(data_dir, distribution, q, train_images, test_images, start_index = 1, seed = 1):
     '''
         Example:
             data_dir = "SimulationDataset/Scenario1/n500"
             distribution = "poisson"
     '''
 
+    # The name of the distribution does not have any numbers. Simulations like the RPG which are considered for two different values of q have different numbers associated to their directory, which must be conserved for the function to know where to save the files. But for selection of the model in select_model, we must use only "rgp"
+    distribution_name = ''.join([i for i in distribution if not i.isdigit()])
+    
     # Select the functions associated to the chosen distribution model
-    log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max = select_model(distribution, q)
+    log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max = select_model(distribution_name, q)
     log_a_tf = eval(log_a_str)
     log_phi_tf = eval(log_phi_str)
     C_tf = eval(C_str)
@@ -283,19 +285,18 @@ def run_scenario(data_dir, distribution, q, train_images, test_images, seed = 1)
     loss_val_values = []
     converged = []
     steps = []
-    # for i in tqdm(range(1, 101)):
-    for i in tqdm(range(1, 2)):
+    for i in tqdm(range(start_index, 101)):
         # Load the simulated dataset
         sim_dataset = load_file(data_dir, i, distribution, train_images, test_images)
         
         _, s_t = initialize_alpha_s(sim_dataset["t_train"], n_cuts = 5)
         start_time = time()
-        result = fit_cure_model(distribution, q,
+        result = fit_cure_model(distribution_name, q,
                                 sim_dataset["t_train"], sim_dataset["t_val"],
                                 sim_dataset["delta_train"], sim_dataset["delta_val"],
                                 sim_dataset["img_train"], sim_dataset["img_val"],
                                 batch_size = None, max_iterations = 100,
-                                seed = 1, verbose = 0)
+                                seed = seed, verbose = 0)
         elapsed_time = time() - start_time
         execution_times.append(elapsed_time)
         
@@ -351,15 +352,15 @@ def run_scenario(data_dir, distribution, q, train_images, test_images, seed = 1)
 if(__name__ == "__main__"):
     seed = 100
     data_dir = input("Digite a pasta com os dados da simulação (Ex: SimulationDataset/Scenario1/n500): ")
-    distribution = input("Digite a distribuição a ser considerada")
-    q = input("Digite o valor do parâmetro adicional q (Se não houver, digite None)")
+    distribution = input("Digite a distribuição a ser considerada: ")
+    q = input("Digite o valor do parâmetro adicional q (Se não houver, digite None): ")
 
     if(q.lower() == "none"):
         q = None
     else:
         q = float(q)
 
-    run_scenario(data_dir, distribution, q, train_images, test_images, seed = 1)
+    run_scenario(data_dir, distribution, q, train_images, test_images, start_index = 1, seed = 1)
 
 
 

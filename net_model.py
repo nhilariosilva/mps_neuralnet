@@ -100,8 +100,8 @@ class MPScrModelStructure(keras.models.Model):
             self.r_max = np.max([C_theta_min, C_theta_max])
             self.r_mid = (self.r_min + self.r_max)/2
 
-            # Se o r mínimo for 1 e o máximo for infinito, então mesmo havendo uma restrição em theta, não há uma restrição na probabilidade de cura, seguindo normalmente o processo de estimação
-            if( (self.r_min-1.0)<1.0e-12 and tf.math.is_inf(self.r_max)):
+            # Se o r mínimo for 1 e o máximo for infinito, então mesmo havendo uma restrição em theta, não há uma restrição na probabilidade de cura, seguindo normalmente o processo de estimação. Se r_min e r_max forem nan, também temos que não há restrições (é o caso em que a probabilidade de cura não está definida para os valores de theta nos limites do espaço paramétrico)
+            if( (np.isnan(self.r_min) or np.isnan(self.r_max)) or ((self.r_min-1.0)<1.0e-12 and tf.math.is_inf(self.r_max)) ):
                 self.r_min = None
                 self.r_max = None
                 self.r_mid = None
