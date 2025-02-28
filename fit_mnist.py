@@ -351,7 +351,7 @@ def run_scenario(data_dir, distribution, q, train_images, test_images, start_ind
 
 if(__name__ == "__main__"):
     seed = 100
-    data_dir = input("Digite a pasta com os dados da simulação (Ex: SimulationDataset/Scenario1/n500): ")
+    data_dir = input("Digite a pasta com os dados da simulação (Ex: SimulationDataset/Scenario2/n500): ")
     distribution = input("Digite a distribuição a ser considerada: ")
     q = input("Digite o valor do parâmetro adicional q (Se não houver, digite None): ")
 
