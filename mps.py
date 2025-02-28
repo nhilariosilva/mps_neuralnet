@@ -18,7 +18,7 @@ def pmf(x, log_a, log_phi, theta, sup, force_broadcasting = False):
     # Se theta é uma lista, o converte para np.array
     if(type(theta) == list):
         theta = np.array(theta)
-    
+
     # Garante um formato de colunas para theta para realizar o broadcasting, caso necessário
     theta = np.reshape(theta, (len(theta), 1))
     
@@ -90,18 +90,6 @@ def cdf(x, log_a, log_phi, theta, sup, lower_tail = True, force_broadcasting = F
         fsup_cum_cdf = fsup_cum_cdf[0,:]
     
     return fsup_cum_cdf
-
-# def rvs_single_theta(log_a, log_phi, theta, sup):
-#     sup = sup.astype("float64") # Evita problemas nas funções a e phi
-#     probs = pmf(sup, log_a, log_phi, theta, sup)
-#     return np.random.choice(sup, size = 1, replace = True, p = probs)
-    
-# def rvs(log_a, log_phi, theta, sup, size = 1):
-#     if( (type(theta) == list or type(theta) == type(np.array([]))) ):
-#         return np.array([rvs_single_theta(log_a, log_phi, the, sup) for the in theta]).flatten()
-    
-#     probs = pmf(sup, log_a, log_phi, theta, sup)
-#     return np.random.choice(sup, size = size, replace = True, p = probs)
 
 def rvs(log_a, log_phi, theta, sup, size = 1):
     # If theta is not a list (i.e. it is a single digit) just sample the sample using np.random.choice with the required size
