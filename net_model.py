@@ -604,9 +604,9 @@ def call_EM(em_filename,
     else:
         # If verbose = 0, supresses all possible outputs from the file
         subprocess_result = subprocess.run(
-            ["python3", em_filename],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+           ["python3", em_filename],
+           stdout=subprocess.DEVNULL,
+           stderr=subprocess.DEVNULL
         )
 
     model_history = []

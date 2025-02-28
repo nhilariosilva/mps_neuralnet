@@ -297,7 +297,6 @@ def sample_single_bootstrap_scenario2(i_train, i_test, n_train, n_val, n_test, c
     indices = np.concatenate([i_train_val, i_test])
     pd.DataFrame({"index": indices, "set": sets}).to_csv("{}/indices_{}.csv".format(directory, file_index))
 
-    
     # The labels for the train set are the first n_train sampled indices in i_train_val
     label_train = train_labels[i_train_val[:n_train]]
     # The labels for the validation set are the last n_train sampled indices in i_train_val

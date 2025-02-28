@@ -228,7 +228,7 @@ def sup_rgp(q):
             raise Exception("q value can't be less than -1")
         max_sup_candidates = np.arange(1, 101)
         max_sup = max_sup_candidates[(1 + max_sup_candidates*q) > 0][-1]
-        return np.arange(max_sup+1)
+        return np.arange(max_sup+1).astype(np.float64)
 # Versões para o EM - Invoca o nome das funções acima para ser carregada no arquivo EM.py
 log_a_rgp_str = "log_a_rgp_tf({})"
 log_phi_rgp_str = "log_phi_rgp_tf({})"
@@ -285,7 +285,7 @@ def C_inv_geeta(q):
     return lambda u : 1 - u**(1/(1-q))
 # Versões para o tensorflow
 def log_a_geeta_tf(q):
-    return lambda m : tf.math.lgamma(q*m+q) - tf.math.lgamma(m+2) - tf.math.lgamma(q*m+q) - tf.math.log(q*m+q-1)
+    return lambda m : tf.math.lgamma(q*m+q) - tf.math.lgamma(m+2) - tf.math.lgamma((q-1)*m+q-1) - tf.math.log(q*m+q-1)
 def log_phi_geeta_tf(q):
     return lambda theta : tf.math.log(theta) + (q-1)*tf.math.log(1-theta)
 def C_geeta_tf(q):
@@ -310,5 +310,114 @@ def Var_geeta(q, theta):
     p = theta
     s = 1-p
     return p*s*(q-1)/(s-p*(q-1))**2 + p**2*s*(q-1)*q/(s-p*(q-1))**3
+
+
+def select_model(distribution, q):
+    if(distribution == "poisson"):      
+        log_a_str = log_a_poisson_str
+        log_phi_str = log_phi_poisson_str
+        C_str = C_poisson_str
+        C_inv_str = C_inv_poisson_str
+        sup_str = sup_poisson_str
+        theta_min = None
+        theta_max = None
+    elif(distribution == "logarithmic"):
+        log_a_str = log_a_log_str
+        log_phi_str = log_phi_log_str
+        C_str = C_log_str
+        C_inv_str = C_inv_log_str
+        sup_str = sup_log_str
+        theta_min = 0
+        theta_max = 1
+    elif(distribution == "nb" or distribution == "mvnb"):
+        if(q is None):
+            raise Exception("Please, specify the fixed parameter (q) for the distribution.")
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant({}, dtype = tf.float64)".format(q)
+        log_a_str = log_a_mvnb_str.format(q_argument)
+        log_phi_str = log_phi_mvnb_str.format(q_argument)
+        C_str = C_mvnb_str.format(q_argument)
+        C_inv_str = C_inv_mvnb_str.format(q_argument)
+        sup_str = sup_mvnb_str.format(q_argument)
+        theta_min = None
+        theta_max = None
+    elif(distribution == "geometric"):
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant(1, dtype = tf.float64)"
+        log_a_str = log_a_mvnb_str.format(q_argument)
+        log_phi_str = log_phi_mvnb_str.format(q_argument)
+        C_str = C_mvnb_str.format(q_argument)
+        C_inv_str = C_inv_mvnb_str.format(q_argument)
+        sup_str = sup_mvnb_str.format(q_argument)
+        theta_min = None
+        theta_max = None
+    elif(distribution == "binomial"): 
+        if(q is None):
+            raise Exception("Please, specify the fixed parameter (q) for the distribution.")
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant({}, dtype = tf.float64)".format(q)
+        log_a_str = log_a_bin_str.format(q_argument)
+        log_phi_str = log_phi_bin_str.format(q_argument)
+        C_str = C_bin_str.format(q_argument)
+        C_inv_str = C_inv_bin_str.format(q_argument)
+        sup_str = sup_bin_str.format(q_argument)
+        theta_min = 0
+        theta_max = 1
+    elif(distribution == "bernoulli"):
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant(1, dtype = tf.float64)"
+        log_a_str = log_a_bin_str.format(q_argument)
+        log_phi_str = log_phi_bin_str.format(q_argument)
+        C_str = C_bin_str.format(q_argument)
+        C_inv_str = C_inv_bin_str.format(q_argument)
+        sup_str = sup_bin_str.format(q_argument)
+        theta_min = 0
+        theta_max = 1
+    elif(distribution == "rgp"):
+        if(q is None):
+            raise Exception("Please, specify the fixed parameter (q) for the distribution.")
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant({}, dtype = tf.float64)".format(q)
+        log_a_str = log_a_rgp_str.format(q_argument)
+        log_phi_str = log_phi_rgp_str.format(q_argument)
+        C_str = C_rgp_str.format(q_argument)
+        C_inv_str = C_inv_rgp_str.format(q_argument)
+        sup_str = sup_rgp_str.format(q_argument)
+        theta_min = 0
+        theta_max = np.abs(1/q)
+    elif(distribution == "borel"):
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant(1, dtype = tf.float64)"
+        log_a_str = log_a_rgp_str.format(q_argument)
+        log_phi_str = log_phi_rgp_str.format(q_argument)
+        C_str = C_rgp_str.format(q_argument)
+        C_inv_str = C_inv_rgp_str.format(q_argument)
+        sup_str = sup_rgp_str.format(q_argument)
+        theta_min = 0
+        theta_max = 1
+    elif(distribution == "geeta"):
+        if(q is None):
+            raise Exception("Please, specify the fixed parameter (q) for the distribution.")
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant({}, dtype = tf.float64)".format(q)
+        log_a_str = log_a_geeta_str.format(q_argument)
+        log_phi_str = log_phi_geeta_str.format(q_argument)
+        C_str = C_geeta_str.format(q_argument)
+        C_inv_str = C_inv_geeta_str.format(q_argument)
+        sup_str = sup_geeta_str.format(q_argument)
+        theta_min = 0
+        theta_max = np.abs(1/q)
+    elif(distribution == "haight"):
+        # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
+        q_argument = "tf.constant(2, dtype = tf.float64)"
+        log_a_str = log_a_geeta_str.format(q_argument)
+        log_phi_str = log_phi_geeta_str.format(q_argument)
+        C_str = C_geeta_str.format(q_argument)
+        C_inv_str = C_inv_geeta_str.format(q_argument)
+        sup_str = sup_geeta_str.format(q_argument)
+        theta_min = 0
+        theta_max = 1/2
+    
+    return log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max
 
     

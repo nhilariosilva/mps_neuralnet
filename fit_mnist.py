@@ -358,7 +358,7 @@ if(__name__ == "__main__"):
     if(q.lower() == "none"):
         q = None
     else:
-        q = float(q)
+        q = float(eval(q))
 
     run_scenario(data_dir, distribution, q, train_images, test_images, start_index = 1, seed = 1)
 
