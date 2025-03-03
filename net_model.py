@@ -638,3 +638,49 @@ def call_EM(em_filename,
     }
 
     return results
+
+
+def Spop_known_S1(S1, log_a, log_phi, theta, sup):
+    '''
+        Population survival function when the array of non cured survival probabilities have already been computed.
+    '''
+    # Reshape the object to a column vector
+    S1 = np.reshape(S1, (len(S1), 1))
+
+    # Perform opperation S1^sup (for the probability generation function)
+    pgf_coef = S1**sup
+    # Reshape the probability generation function coefficients to meet the shape of the probabilities
+    pgf_coef = pgf_coef.T[np.newaxis, :, :] # Shape: (1, <sup size>, <number of times>)
+
+    f_sup = mps.pmf(sup, log_a, log_phi, theta, sup)
+    # Reshape the probabilities to meet the pgf_coef shape
+    f_sup = f_sup[:, :, np.newaxis] # Shape: (<theta size>, <sup_size>, 1)
+    
+    # # Obtain the actual terms from the pgf summation
+    #pgf_terms = pgf_coef * f_sup # Shape: (<theta_size>, <sup_size>, <number of times>)
+    # # Sum through the support, getting for each theta, all the respective population survival times
+    # pgf_result = np.sum(pgf_terms, axis = 1) # Shape: (<theta size>, <number of times>) --- theta_size = number of times!
+    # # The above code gets into memory trouble and is not very efficient! Leaving here for future updates
+
+    # To avoid getting into memory trouble with intermediate results, we use the fact that the theta and the S1 dimension is actually the same
+    # (because for each individual, we have exactly one theta and one time value!)
+    # Using that fact, we will be using Einstein summation convention standard for tensors with the numpy function np.einsum
+
+    # I'm telling numpy the following:
+    # We have the matrices A = pgf_coef (1, <sup size>, <number of times>) and B = f_sup (<theta size>, <sup_size>, 1)
+    # dim A indices = (i, j, k) ; dim B indices = (k, j, ell)
+    # For each fixed pair (i, ell, k) which index both t and theta (the same dimension) ("->il") we multiply both matrices and sum only through the indices j, which are
+    # correspondent to the support indices
+    pgf_result = np.einsum("ijk,kjl->ilk", pgf_coef, f_sup) # Shape: (1, 1, <number of times>)
+    
+    return pgf_result[0,0,:]
+
+# Função de sobrevivência base do modelo (exponencial por partes)
+def Spop(t, alpha, s, log_a, log_phi, theta, sup):
+    '''
+        Population survival function when the array of non cured survival probabilities have not been computed yet.
+    '''
+    # Precompute the actual non cured survival probabilities
+    S1_values = S1(t, alpha, s)
+    # Just call the Spop with S1 known
+    return Spop_known_S1(S1, log_a, log_phi, theta, sup)

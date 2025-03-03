@@ -3,14 +3,19 @@ import warnings
 
 import numpy as np
 
+from silence_tensorflow import silence_tensorflow
+silence_tensorflow()
+import tensorflow as tf
+import tensorflow_probability as tfp
+
 from scipy.stats import rv_discrete
 
 def pmf(x, log_a, log_phi, theta, sup, force_broadcasting = False):
     # Se x é um número e não um vetor
-    if( type(x) not in [type(np.array([])), list] ):
+    if( type(x) not in [type(np.array([])), list, type(tf.constant(0.0))] ):
         x = np.array([x])
     # Se theta é um número e não um vetor
-    if( type(theta) not in [type(np.array([])), list] ):
+    if( type(theta) not in [type(np.array([])), list, type(tf.constant(0.0))] ):
         theta = np.array([theta])
     # Se x é uma lista, o converte para np.array
     if(type(x) == list):
@@ -18,7 +23,7 @@ def pmf(x, log_a, log_phi, theta, sup, force_broadcasting = False):
     # Se theta é uma lista, o converte para np.array
     if(type(theta) == list):
         theta = np.array(theta)
-
+    
     # Garante um formato de colunas para theta para realizar o broadcasting, caso necessário
     theta = np.reshape(theta, (len(theta), 1))
     
@@ -43,10 +48,10 @@ def pmf(x, log_a, log_phi, theta, sup, force_broadcasting = False):
 
 def cdf(x, log_a, log_phi, theta, sup, lower_tail = True, force_broadcasting = False):
     # Se x é um número e não um vetor
-    if( type(x) not in [type(np.array([])), list] ):
+    if( type(x) not in [type(np.array([])), list, type(tf.constant(0.0))] ):
         x = np.array([x])
     # Se theta é um número e não um vetor
-    if( type(theta) not in [type(np.array([])), list] ):
+    if( type(theta) not in [type(np.array([])), list, type(tf.constant(0.0))] ):
         theta = np.array([theta])
     # Se x é uma lista, o converte para np.array
     if(type(x) == list):
@@ -54,10 +59,10 @@ def cdf(x, log_a, log_phi, theta, sup, lower_tail = True, force_broadcasting = F
     # Se theta é uma lista, o converte para np.array
     if(type(theta) == list):
         theta = np.array(theta)# Se x é um número e não um vetor
-    if( type(x) not in [type(np.array([])), list] ):
+    if( type(x) not in [type(np.array([])), list, type(tf.constant(0.0))] ):
         x = np.array([x])
     # Se theta é um número e não um vetor
-    if( type(theta) not in [type(np.array([])), list] ):
+    if( type(theta) not in [type(np.array([])), list, type(tf.constant(0.0))] ):
         theta = np.array([theta])
     
     # Evita problemas nas funções log_a e log_phi
@@ -93,7 +98,8 @@ def cdf(x, log_a, log_phi, theta, sup, lower_tail = True, force_broadcasting = F
 
 def rvs(log_a, log_phi, theta, sup, size = 1):
     # If theta is not a list (i.e. it is a single digit) just sample the sample using np.random.choice with the required size
-    if( (type(theta) != list and type(theta) != type(np.array([]))) ):
+    # if( (type(theta) != list and type(theta) != type(np.array([]))) ):
+    if( type(theta) not in [list, type(np.array([])), type(tf.constant(0.0))] ):
         return np.random.choice(sup, size = size, replace = True, p = pmf(sup, log_a, log_phi, theta, sup))
 
     # If theta is a vector of parameters obtain the matrix with all the cdf values for each sup value and each theta
