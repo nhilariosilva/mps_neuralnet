@@ -640,15 +640,15 @@ def call_EM(em_filename,
     return results
 
 
-def Spop_known_S1(S1, log_a, log_phi, theta, sup):
+def Spop_known_S1(S1_values, log_a, log_phi, theta, sup):
     '''
         Population survival function when the array of non cured survival probabilities have already been computed.
     '''
     # Reshape the object to a column vector
-    S1 = np.reshape(S1, (len(S1), 1))
+    S1_values = np.reshape(S1_values, (len(S1_values), 1))
 
     # Perform opperation S1^sup (for the probability generation function)
-    pgf_coef = S1**sup
+    pgf_coef = S1_values**sup
     # Reshape the probability generation function coefficients to meet the shape of the probabilities
     pgf_coef = pgf_coef.T[np.newaxis, :, :] # Shape: (1, <sup size>, <number of times>)
 
@@ -683,4 +683,4 @@ def Spop(t, alpha, s, log_a, log_phi, theta, sup):
     # Precompute the actual non cured survival probabilities
     S1_values = S1(t, alpha, s)
     # Just call the Spop with S1 known
-    return Spop_known_S1(S1, log_a, log_phi, theta, sup)
+    return Spop_known_S1(S1_values, log_a, log_phi, theta, sup)

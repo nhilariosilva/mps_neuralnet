@@ -351,7 +351,7 @@ def select_model(distribution, q):
         sup_str = sup_mvnb_str.format(q_argument)
         theta_min = None
         theta_max = None
-    elif(distribution == "binomial"): 
+    elif(distribution == "binomial" or distribution == "bin"): 
         if(q is None):
             raise Exception("Please, specify the fixed parameter (q) for the distribution.")
         # In the EM.py file, we must ensure that q is of type tf.float64 for it to work properly
