@@ -249,18 +249,19 @@ def fit_cure_model(distribution, q,
 
 
 
-print("Creating directories structure")
-dists_scenario1 = ["poisson", "logarithmic", "geometric", "mvnb2", "bernoulli", "bin5"]
-dists_scenario2 = ["borel", "rgp2", "rgp10", "haight", "geeta3"]
+print("Creating directories structures")
+dists_scenario1 = ["poisson", "logarithmic", "geometric", "mvnb2", "bernoulli", "bin5", "rgp10"]
+dists_scenario2 = ["borel", "rgp2", "haight", "geeta3"]
 for dist in dists_scenario1:
     for j in range(1,101):
         Path("SimulationResults/Scenario1/n500/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
         Path("SimulationResults/Scenario1/n1000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
         Path("SimulationResults/Scenario1/n3000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
 for dist in dists_scenario2:
-    Path("SimulationResults/Scenario2/n500/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
-    Path("SimulationResults/Scenario2/n1000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
-    Path("SimulationResults/Scenario2/n3000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
+    for j in range(1,101):
+        Path("SimulationResults/Scenario2/n500/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
+        Path("SimulationResults/Scenario2/n1000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
+        Path("SimulationResults/Scenario2/n3000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
 
 def run_scenario(data_dir, distribution, q, train_images, test_images, start_index = 1, seed = 1):
     '''

@@ -50,7 +50,7 @@ def generate_data(log_a, log_phi, theta, sup, low_c, high_c):
         low_c e high_c definem o intervalo para a geração dos tempos de censura, seguindo uma distribuição U[low_c, high_c]
     '''
     n = len(theta)
-    m = mps.rvs(log_a, log_phi, theta, sup, size = 10)
+    m = mps.rvs(log_a, log_phi, theta, sup)
     
     cured = np.zeros(n)
     delta = cured.copy()
@@ -358,30 +358,6 @@ def sample_single_bootstrap_scenario2(i_train, i_test, n_train, n_val, n_test, c
         delta_train_rgp2, delta_val_rgp2, delta_test_rgp2
     )
     rgp2_data.to_csv("{}/rgp2/{}".format(directory, filename), index = False)
-    
-
-    # ---------------------------- RGP(q = -1/10) ----------------------------
-    # RGP(-1/10) - Training data
-    theta_train_rgp10 = get_theta(log_a_rgp(-1/10), log_phi_rgp(-1/10), C_rgp(-1/10), C_inv_rgp(-1/10), sup_rgp(-1/10), p_train, theta_min = theta_min_rgp, theta_max = theta_max_rgp(-1/10))
-    m_train_rgp10, t_train_rgp10, delta_train_rgp10, cured_train_rgp10 = \
-        generate_data(log_a_rgp(-1/10), log_phi_rgp(-1/10), theta_train_rgp10, sup_rgp(-1/10), low_c, high_c)
-    # RGP(-1/10) - Validation data
-    theta_val_rgp10 = get_theta(log_a_rgp(-1/10), log_phi_rgp(-1/10), C_rgp(-1/10), C_inv_rgp(-1/10), sup_rgp(-1/10), p_val, theta_min = theta_min_rgp, theta_max = theta_max_rgp(-1/10))
-    m_val_rgp10, t_val_rgp10, delta_val_rgp10, cured_val_rgp10 = \
-        generate_data(log_a_rgp(-1/10), log_phi_rgp(-1/10), theta_val_rgp10, sup_rgp(-1/10), low_c, high_c)
-    # RGP(-1/10) - Test data
-    theta_test_rgp10 = get_theta(log_a_rgp(-1/10), log_phi_rgp(-1/10), C_rgp(-1/10), C_inv_rgp(-1/10), sup_rgp(-1/10), p_test, theta_min = theta_min_rgp, theta_max = theta_max_rgp(-1/10))
-    m_test_rgp10, t_test_rgp10, delta_test_rgp10, cured_test_rgp10 = \
-        generate_data(log_a_rgp(-1/10), log_phi_rgp(-1/10), theta_test_rgp10, sup_rgp(-1/10), low_c, high_c)
-    # Save the DataFrame with the simulated values for the RGP(-1/10)
-    rgp10_data = join_datasets(
-        n_train, n_val, n_test,
-        theta_train_rgp10, theta_val_rgp10, theta_test_rgp10,
-        m_train_rgp10, m_val_rgp10, m_test_rgp10,
-        t_train_rgp10, t_val_rgp10, t_test_rgp10,
-        delta_train_rgp10, delta_val_rgp10, delta_test_rgp10
-    )
-    rgp10_data.to_csv("{}/rgp10/{}".format(directory, filename), index = False)
 
     # ---------------------------- Haight ----------------------------
     # Haight - Training data
@@ -408,15 +384,15 @@ def sample_single_bootstrap_scenario2(i_train, i_test, n_train, n_val, n_test, c
 
     # ---------------------------- Geeta(q = 3) ----------------------------
     # Geeta(3) - Training data
-    theta_train_geeta3 = get_theta(log_a_geeta(3), log_phi_geeta(3), C_geeta(3), C_inv_geeta(3), sup_geeta, p_train, theta_min = theta_min_rgp, theta_max = theta_max_geeta(3))
+    theta_train_geeta3 = get_theta(log_a_geeta(3), log_phi_geeta(3), C_geeta(3), C_inv_geeta(3), sup_geeta, p_train, theta_min = theta_min_geeta, theta_max = theta_max_geeta(3))
     m_train_geeta3, t_train_geeta3, delta_train_geeta3, cured_train_geeta3 = \
         generate_data(log_a_geeta(3), log_phi_geeta(3), theta_train_geeta3, sup_geeta, low_c, high_c)
     # Geeta(3) - Validation data
-    theta_val_geeta3 = get_theta(log_a_geeta(3), log_phi_geeta(3), C_geeta(3), C_inv_geeta(3), sup_geeta, p_val, theta_min = theta_min_rgp, theta_max = theta_max_geeta(3))
+    theta_val_geeta3 = get_theta(log_a_geeta(3), log_phi_geeta(3), C_geeta(3), C_inv_geeta(3), sup_geeta, p_val, theta_min = theta_min_geeta, theta_max = theta_max_geeta(3))
     m_val_geeta3, t_val_geeta3, delta_val_geeta3, cured_val_geeta3 = \
         generate_data(log_a_geeta(3), log_phi_geeta(3), theta_val_geeta3, sup_geeta, low_c, high_c)
     # Geeta(3) - Test data
-    theta_test_geeta3 = get_theta(log_a_geeta(3), log_phi_geeta(3), C_geeta(3), C_inv_geeta(3), sup_geeta, p_test, theta_min = theta_min_rgp, theta_max = theta_max_geeta(3))
+    theta_test_geeta3 = get_theta(log_a_geeta(3), log_phi_geeta(3), C_geeta(3), C_inv_geeta(3), sup_geeta, p_test, theta_min = theta_min_geeta, theta_max = theta_max_geeta(3))
     m_test_geeta3, t_test_geeta3, delta_test_geeta3, cured_test_geeta3 = \
         generate_data(log_a_geeta(3), log_phi_geeta(3), theta_test_geeta3, sup_geeta, low_c, high_c)
     # Save the DataFrame with the simulated values for the Geeta(3)
@@ -463,7 +439,7 @@ if(__name__ == "__main__"):
     print("Dimension of the test set: {}".format(test_images.shape))
     print("------------------------------------------------------------------------------------")
     
-    print("Creating directories structure")
+    print("Creating directories structures")
     dists_scenario1 = ["poisson", "logarithmic", "geometric", "mvnb2", "bernoulli", "bin5"]
     dists_scenario2 = ["borel", "rgp2", "rgp10", "haight", "geeta3"]
     for dist in dists_scenario1:

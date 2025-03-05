@@ -289,7 +289,7 @@ def log_a_geeta_tf(q):
 def log_phi_geeta_tf(q):
     return lambda theta : tf.math.log(theta) + (q-1)*tf.math.log(1-theta)
 def C_geeta_tf(q):
-    return lambda theta : 1/(1-theta)
+    return lambda theta : (1-theta)**(1-q)
 def C_inv_geeta_tf(q):
     return lambda u : 1 - u**(1/(1-q))
 sup_geeta = np.arange(0, B, 1).astype(np.float64)
