@@ -202,11 +202,6 @@ class MPScrModelStructure(keras.models.Model):
             parametric_space_penalty = mean_penalty_lower + mean_penalty_upper
 
         # Caso parametric_space_penalty = 0, calcula a perda com base na verossimilhança (primeiro lambda), caso contrário, usa a perda referente ao espaço paramétrico (segundo lambda)
-        # loss_value = tf.cond(
-        #     tf.equal(parametric_space_penalty, 0.0),  # Condition
-        #     lambda: self.calculate_loss_weights_mean(r0, m, p0),  # True branch
-        #     lambda: parametric_space_penalty # False branch
-        # )
         loss_value = tf.cond(
             tf.equal(parametric_space_penalty, 0.0),  # Condition
             lambda: self.calculate_loss_weights_mean(r0, m, log_p0),  # True branch
@@ -215,7 +210,6 @@ class MPScrModelStructure(keras.models.Model):
         
         return loss_value
     
-    # @tf.function
     def train_step(self, data):
         x_train, m_train = data
         

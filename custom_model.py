@@ -14,8 +14,8 @@ class MPScrModel(MPScrModelStructure):
         # Gera uma imagem inteira de zeros com as dimensões do modelo
         dummy_input = keras.layers.Input(shape = self.shape_input)
         
-        # initializer = initializers.HeNormal(seed = seed)
-        initializer = tf.random_normal_initializer(stddev = 0.005)
+        initializer = initializers.HeNormal(seed = seed)
+        # initializer = tf.random_normal_initializer(stddev = 0.005) # IF CONVERGENCE FAILS, RETURN TO THIS INITIALIZER!!!
         
         self.convolution1 = keras.layers.Conv2D(filters = 4, kernel_size = [5,5], padding = "same", activation = tf.nn.leaky_relu,
                                                 kernel_initializer = initializer, dtype = tf.float32)

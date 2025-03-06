@@ -330,7 +330,7 @@ def run_scenario(data_dir, distribution, q, train_images, test_images, start_ind
         sets = np.concatenate([np.repeat("train", len(theta_train_pred)), np.repeat("val", len(theta_val_pred)), np.repeat("test", len(theta_test_pred))])
 
         results_dir = data_dir.split("/")
-        results_dir = "{}/{}".format("SimulationResults", "/".join(results_dir[1:]))
+        results_dir = "{}/{}".format("SimulationResults4", "/".join(results_dir[1:]))
         pd.DataFrame({"p_pred": p_pred, "theta_pred": theta_pred, "m_pred": m_pred, "set": sets}).to_csv(
             "{}/{}/{}/data_pred.csv".format(results_dir, distribution, i), index = False
         )
@@ -355,13 +355,14 @@ if(__name__ == "__main__"):
     data_dir = input("Digite a pasta com os dados da simulação (Ex: SimulationDataset/Scenario2/n500): ")
     distribution = input("Digite a distribuição a ser considerada: ")
     q = input("Digite o valor do parâmetro adicional q (Se não houver, digite None): ")
+    start_index = int(input("Digite o indice de inicio:"))
 
     if(q.lower() == "none"):
         q = None
     else:
         q = float(eval(q))
 
-    run_scenario(data_dir, distribution, q, train_images, test_images, start_index = 1, seed = 1)
+    run_scenario(data_dir, distribution, q, train_images, test_images, start_index = start_index, seed = 1)
 
 
 

@@ -487,7 +487,7 @@ if(__name__ == "__main__"):
         r = input()
     if(deleted_directory or r[0].lower() == "y"):
         print("---------------------------- Scenario 2 ----------------------------")
-        cure_probs_dict2 = {0: 0.95, 1:0.85, 2:0.75, 3:0.65, 4: 0.55}
+        cure_probs_dict2 = {0: 0.95, 1:0.9, 2:0.85, 3:0.75, 4: 0.65}
         cure_probs_dict2 = np.vectorize(cure_probs_dict2.get)
     
         train_sizes = [500, 1000, 3000] # 3 sample sizes

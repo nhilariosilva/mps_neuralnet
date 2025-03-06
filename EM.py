@@ -93,7 +93,7 @@ C_inv_tf = eval(C_inv_str)
 sup_tf = eval(sup_str)
 
 # Carregamento do modelo - Os pesos são os mesmos do modelo inicial recebido como argumento
-model = MPScrModel(log_a_tf, log_phi_tf, C_tf, C_inv_tf, sup_tf, theta_min, theta_max, "logit")
+model = MPScrModel(log_a_tf, log_phi_tf, C_tf, C_inv_tf, sup_tf, theta_min, theta_max, "logit", verbose)
 model.define_structure(shape_input = x[0].shape)
 model.load_model("{}/model.weights.h5".format(data_dir))
 
