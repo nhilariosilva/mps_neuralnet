@@ -14,22 +14,15 @@ class MPScrModel(MPScrModelStructure):
         # Gera uma imagem inteira de zeros com as dimensões do modelo
         dummy_input = keras.layers.Input(shape = self.shape_input)
         
-        # initializer = initializers.HeNormal(seed = seed)
-        initializer = tf.random_normal_initializer(stddev = 0.005)
+        initializer = initializers.HeUniform(seed = seed)
         
-        self.convolution1 = keras.layers.Conv2D(filters = 4, kernel_size = [5,5], padding = "same", activation = tf.nn.leaky_relu,
+        self.convolution1 = keras.layers.Conv2D(filters = 32, kernel_size = [3,3], padding = "same", activation = tf.nn.leaky_relu,
                                                 kernel_initializer = initializer, dtype = tf.float32)
-        self.pooling1 = keras.layers.MaxPool2D(pool_size = [2,2], strides = 2)
-        self.convolution2 = keras.layers.Conv2D(filters = 12, kernel_size = [5,5], padding = "same", activation = tf.nn.leaky_relu,
-                                                kernel_initializer = initializer, dtype = tf.float32)
-        self.pooling2 = keras.layers.MaxPool2D(pool_size = [2,2], strides = 2)
-        self.convolution3 = keras.layers.Conv2D(filters = 32, kernel_size = [5,5], padding = "same", activation = tf.nn.leaky_relu,
-                                                kernel_initializer = initializer, dtype = tf.float32)
-        self.pooling3 = keras.layers.MaxPool2D(pool_size = [2,2], strides = 2)
+        self.pooling1 = keras.layers.MaxPool2D(pool_size = [3,3], strides = 2)
     
         self.flatten = keras.layers.Reshape(target_shape=(-1,))
-        self.dense1 = keras.layers.Dense(units = 128, activation = tf.nn.tanh, dtype = tf.float32)
-        self.dense2 = keras.layers.Dense(dtype = tf.float32, units = 1, activation = None, use_bias = False)
+        self.dense1 = keras.layers.Dense(units = 100, activation = tf.nn.relu, dtype = tf.float32)
+        self.dense2 = keras.layers.Dense(units = 1, dtype = tf.float32, activation = None, use_bias = False)
 
         # Initialize the model weights (if not called beforehand, the method .get_weights() returns an empty list)
         self(dummy_input)
@@ -37,10 +30,6 @@ class MPScrModel(MPScrModelStructure):
     def call(self, x_input):
         x = self.convolution1(x_input)
         x = self.pooling1(x)
-        x = self.convolution2(x)
-        x = self.pooling2(x)
-        x = self.convolution3(x)
-        x = self.pooling3(x)
         x = self.flatten(x)
         x = self.dense1(x)
         x = self.dense2(x)
