@@ -218,7 +218,7 @@ def fit_cure_model(distribution, q,
                    early_stopping_nn = True, early_stopping_min_delta_nn = 0.0, early_stopping_patience_nn = 5,
                    reduce_lr = True, reduce_lr_steps = 10, reduce_lr_factor = 0.1,
                    verbose = 1, seed = 1):
-    alpha0, s_t = initialize_alpha_s(t_train, n_cuts = 5)
+    alpha0, s_t = initialize_alpha_s(t_train, delta_train, n_cuts = 5)
 
     # Select the MPS functions based on the chosen distribution
     log_a_str, log_phi_str, C_str, C_inv_str, sup_str, theta_min, theta_max = select_model(distribution, q)
@@ -264,23 +264,38 @@ def run_scenario(data_dir, distribution, q, train_images, test_images, start_ind
     C_tf = eval(C_str)
     C_inv_tf = eval(C_inv_str)
     sup_tf = eval(sup_str)
+
+    results_dir = data_dir.split("/")
+    results_dir = "{}/{}".format("SimulationResults2", "/".join(results_dir[1:]))
+
+    metadata_filename = "{}/{}/sim_metadata.csv".format(results_dir, distribution)
+    # If metadata file exists, load it. If not, just initialize the metadata lists as empty
+    if( os.path.isfile(metadata_filename) ):
+        sim_metadata = pd.read_csv(metadata_filename)
+        execution_times = sim_metadata["execution_times"].to_list()
+        loss_values = sim_metadata["loss_values"].to_list()
+        loss_val_values = sim_metadata["loss_val_values"].to_list()
+        converged = sim_metadata["converged"].to_list()
+        steps = sim_metadata["steps"].to_list()
+    else:
+        execution_times = []
+        loss_values = []
+        loss_val_values = []
+        converged = []
+        steps = []
     
-    execution_times = []
-    loss_values = []
-    loss_val_values = []
-    converged = []
-    steps = []
     for i in tqdm(range(start_index, 101)):
         # Load the simulated dataset
         sim_dataset = load_file(data_dir, i, distribution, train_images, test_images)
         
-        _, s_t = initialize_alpha_s(sim_dataset["t_train"], n_cuts = 5)
+        _, s_t = initialize_alpha_s(sim_dataset["t_train"], sim_dataset["delta_train"], n_cuts = 5)
         start_time = time()
+        # We must be careful with the batch_size! Lowering it may lead to the model converging too early!
         result = fit_cure_model(distribution_name, q,
                                 sim_dataset["t_train"], sim_dataset["t_val"],
                                 sim_dataset["delta_train"], sim_dataset["delta_val"],
                                 sim_dataset["img_train"], sim_dataset["img_val"],
-                                batch_size = None, max_iterations = 100,
+                                batch_size = None, max_iterations = 60, early_stopping_em_eps = 1.0e-5,
                                 seed = seed, verbose = 0)
         elapsed_time = time() - start_time
         execution_times.append(elapsed_time)
@@ -330,9 +345,9 @@ def run_scenario(data_dir, distribution, q, train_images, test_images, start_ind
         converged.append( result["converged"] )
         steps.append( result["steps"] )
 
-    pd.DataFrame({"execution_times": execution_times, "loss_values": loss_values, "loss_val_values": loss_val_values, "converged": converged, "steps": steps}).to_csv(
-        "{}/{}/sim_metadata.csv".format(results_dir, distribution, i), index = False
-    )
+        pd.DataFrame({"execution_times": execution_times, "loss_values": loss_values, "loss_val_values": loss_val_values, "converged": converged, "steps": steps}).to_csv(
+            "{}/{}/sim_metadata.csv".format(results_dir, distribution, i), index = False
+        )
 
 if(__name__ == "__main__"):
 
@@ -350,18 +365,56 @@ if(__name__ == "__main__"):
             Path("SimulationResults2/Scenario2/n1000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
             Path("SimulationResults2/Scenario2/n3000/{}/{}".format(dist,j)).mkdir(parents=True, exist_ok=True)
     
-    # data_dir = ["SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000"]
-    
-    # distributions = ["logarithmic", "geometric", "mvnb2", "bernoulli", "bin5", "rgp10"]
-    # qs = [None, None, 1/2, None, 5.0, -1/10]
-
-    data_dir = ["SimulationDataset2/Scenario1/n500"]
-    distributions = ["logarithmic"]
-    qs = [None]
+    data_dir = ["SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario1/n3000", "SimulationDataset2/Scenario2/n3000", "SimulationDataset2/Scenario2/n3000", "SimulationDataset2/Scenario2/n3000", "SimulationDataset2/Scenario2/n3000"]
+    distributions = ["logarithmic", "poisson", "geometric", "mvnb2", "bernoulli", "bin5", "rgp10", "borel", "geeta3", "haight", "rgp32"]
+    qs = [None, None, None, 1/2, None, 5.0, -1/10, None, 3.0, None, 3/2]
+    start_indices = [None, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     for j in range(len(data_dir)):
-        print("------------------- Starting {} in {} -------------------".format(distributions[j], data_dir[j]))
-        run_scenario(data_dir[j], distributions[j], qs[j], train_images, test_images, start_index = 1, seed = 1)
+        finished = False
+        
+        # If not specified
+        if(start_indices[j] is None):
+            results_dir = data_dir[j].split("/")
+            results_dir = "{}/{}".format("SimulationResults2", "/".join(results_dir[1:]))
+    
+            metadata_filename = "{}/{}/sim_metadata.csv".format(results_dir, distributions[j])
+            # If metadata file exists, load it. If not, it failed in the first run, then just keep the current_start_index as the setted in the list
+            if( os.path.isfile(metadata_filename) ):
+                sim_metadata = pd.read_csv(metadata_filename)
+                # If there are, say 5 lines in the metadata, it means the simulations should start from index 6
+                current_start_index = sim_metadata.shape[0]+1
+            else:
+                current_start_index = 1
+        else:
+            current_start_index = start_indices[j]
+        
+        # For each scenario, if it detects any error at all. Just set it up again running from where it stopped!
+        while(not finished):
+            # If the start index is greater than it should (not corresponding to any run), just ignore it and go to the next scenario by breaking free of the while loop
+            if(current_start_index > 100):
+                break
+            try:
+                print("------------------- Starting {} in {} -------------------".format(distributions[j], data_dir[j]))
+                run_scenario(data_dir[j], distributions[j], qs[j], train_images, test_images, start_index = current_start_index, seed = 1)
+                # If the command above finished, it goes to the next scenario
+                finished = True
+            except Exception as e:
+                # If any GPU RAM problem happened, it restarts the simulations from where it stopped and try again!
+                print("Simulation stopped! Exception: {}".format(str(e)))
+                print("Trying again...")
+                results_dir = data_dir[j].split("/")
+                results_dir = "{}/{}".format("SimulationResults2", "/".join(results_dir[1:]))
+            
+                metadata_filename = "{}/{}/sim_metadata.csv".format(results_dir, distributions[j])
+                # If metadata file exists, load it. If not, it failed in the first run, then just keep the current_start_index as the setted in the list
+                if( os.path.isfile(metadata_filename) ):
+                    sim_metadata = pd.read_csv(metadata_filename)
+                    # If there are, say 5 lines in the metadata, it means the simulations should start from index 6
+                    current_start_index = sim_metadata.shape[0]+1
+                else:
+                    current_start_index = start_indices[j]
+            
 
 
 

@@ -328,7 +328,10 @@ class MPScrModelStructure(keras.models.Model):
             print("Iniciando treinamento:")
             print("Tamanho da amostra de treino: {}".format(self.x_train.shape[0]))
             print("Tamanho da amostra de validação: {}".format(self.x_val.shape[0]))
-        
+
+        # If batch_size is unspecified, set it to be the training size. Note that decreasing the batch size to smaller values, such as 500 for example, has previously lead the
+        # model to converge too early, leading to a lot of time of investigation. When dealing with neural networks in statistical models context, we recommend to use a single
+        # batch in training. Alternatives in the case that the sample is too big might be to consider a "gradient accumulation" approach.
         self.batch_size = self.x_train.shape[0]
         if(batch_size is not None):
             self.batch_size = batch_size
@@ -450,22 +453,18 @@ def update_m_mps(model, alpha, s, x, t, delta):
     
     # Para o cálculo da função para diferentes thetas, a função mps.pmf leva em conta shape broadcasting, comum ao numpy e ao tensorflow
     f_sup = mps.pmf(model.sup, model.log_a, new_log_phi, new_theta, model.sup)
-
-    # print("f_sup shape: {}".format(f_sup.shape))
     
     E_M = np.sum(f_sup * model.sup, axis = 1)
     E_M2 = np.sum(f_sup * model.sup**2, axis = 1)
     new_m = E_M.copy()
     new_m[delta == 1] = E_M2[delta == 1] / E_M[delta == 1]
-
-    # print("new_m: {}".format(new_m[:20]))
     
     return new_m
 
-def initialize_alpha_s(t, n_cuts = 6):
+def initialize_alpha_s(t, delta, n_cuts = 6):
     alpha0 = np.ones(n_cuts + 1)
     qs = np.linspace(0, 1, n_cuts+1)[1:]
-    s = np.quantile(t, qs)
+    s = np.quantile(t[delta == 1], qs)
     s = np.concatenate([[0],s])
     return alpha0, s
 
